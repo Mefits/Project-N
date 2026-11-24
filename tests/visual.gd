@@ -1,6 +1,7 @@
 extends SceneTree
 const S=preload("res://game/arena.tscn")
 const W=preload("res://game/world.gd")
+const AIR_INPUT=preload("res://tests/air_input.gd")
 func _initialize()->void:call_deferred("_run")
 func capture(name:String)->void:
     await process_frame
@@ -102,6 +103,23 @@ func chain_sequence(scene,name:String,mirror:bool=false,finish:bool=false,launch
         await capture(name+"/frame_%03d"%frame)
     if scene.world.hits!=(4 if finish else 3):push_error("Chain capture mismatch "+name);quit(1)
     if launch and scene.world.launches!=1:push_error("Launch capture mismatch");quit(1)
+func air_sequence(scene,name:String,mirror:bool=false)->void:
+    scene.world=W.new()
+    scene.world.a.separate(150)
+    scene.world.b.separate(scene.world.a.pos.x+60-scene.world.b.pos.x)
+    scene.world.rig_a.sample(scene.world.a)
+    scene.world.rig_b.sample(scene.world.b)
+    scene.debug=false
+    var seq=AIR_INPUT.new()
+    DirAccess.make_dir_recursive_absolute("res://reports/"+name)
+    for frame in range(112):
+        for i in range(4):
+            var input:Dictionary={} if frame<3 else seq.next(scene.world,mirror)
+            scene.world.tick({} if mirror else input,input if mirror else {})
+        scene._hud()
+        scene.queue_redraw()
+        await capture(name+"/frame_%03d"%frame)
+    if scene.world.air_hits!=3 or scene.world.slams!=1 or scene.world.hits!=7:push_error("Air capture mismatch "+name);quit(1)
 func check_skin(scene,state:Dictionary,tick0:int)->void:
     if scene.world.ticks!=tick0 or scene.world.rig_a.points!=state:
         push_error("Skin altered simulation")
@@ -167,6 +185,8 @@ func _run()->void:
     await chain_sequence(scene,"chain_four",false,true)
     await chain_sequence(scene,"chain_launch",false,true,true)
     await chain_sequence(scene,"launch_mirror",true,true,true)
+    await air_sequence(scene,"air_full")
+    await air_sequence(scene,"air_mirror",true)
     var state:Dictionary=scene.world.rig_a.points.duplicate(true)
     var tick0:int=scene.world.ticks
     scene._toggle_skin()

@@ -68,6 +68,8 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
             foot=Vector2((m.feet[i].x-m.pos.x)*direction,m.feet[i].y-m.pos.y-2)
         else:
             foot=MOTION.air(m,i).foot
+        if not m.grounded and action.has("air_"+side):
+            foot=foot.lerp(Vector2(action["air_"+side]),weight)
         if i==0 and action.has("kick_foot"):
             foot=foot.lerp(Vector2(action.kick_foot),weight)
         # A planted leg bends toward the opponent; the elbow bends downward.

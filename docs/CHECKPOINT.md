@@ -46,3 +46,6 @@ Four-hit confirmed string and proportional approach, distinct hurt overlays, gai
 
 ## 0.09c
 Alternate rising strike, true ballistic launch and return to ground. Verify mirrored launch, damage, contact gating, hitstop freeze, floor, bone lengths, recovery and previous kick chain; capture normal and mirrored launcher from real Godot. No aerial followup yet.
+
+## 0.10
+Optional pursuit, linked aerial lead/rear/downward strikes. Verify 7 actual contacts, two directions, no finisher without input, no pursuit on block/whiff, hitstop, bounded trajectories, landing/recovery and prior regressions. Engine frame captures. No effects yet.

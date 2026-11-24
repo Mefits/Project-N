@@ -106,7 +106,7 @@ func _physics_process(dt:float)->void:
     _hud()
     queue_redraw()
 func _hud()->void:
-    hud.text="A/D — движение · W — прыжок · Shift — бег · F ×4 · W+F — подброс · S — блок   |   "+("Y — удар манекена · F2 — P2" if single_player else "P2: ←/→ ↑ ↓ · Ctrl · K/L/;")+"\nN  /  0.09c  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · серия "+str(world.jab_a.chain_count)+" · удары "+str(world.hits)+" · подбросы "+str(world.launches)+" · блоки "+str(world.blocks)+" · парирования "+str(world.parries)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
+    hud.text="A/D — движение · W — прыжок · Shift — бег · F ×4 · W+F — подброс · W — вслед · F ×3 в воздухе   |   "+("Y — удар манекена · F2 — P2" if single_player else "P2: ←/→ ↑ ↓ · Ctrl · K/L/;")+"\nN  /  0.10  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · серия "+str(world.jab_a.chain_count)+" · удары "+str(world.hits)+" · воздух "+str(world.air_hits)+" · подбросы "+str(world.launches)+" · блоки "+str(world.blocks)+" · парирования "+str(world.parries)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
 func _segment(a:Vector2,b:Vector2,width:float,c:Color)->void:
     draw_line(a,b,Color("#17202b"),width+3,true)
     draw_line(a,b,c,width,true)

@@ -15,6 +15,8 @@ var velocity:=Vector2.ZERO
 var facing:int=1
 var grounded:bool=true
 var launched:bool=false
+var pursuing:bool=false
+var slammed:bool=false
 var feet:Array[Vector2]=[]
 var swing:int=-1
 var next_foot:int=0
@@ -69,7 +71,14 @@ func _begin_step(index:int,axis:float)->void:
     swing_to=Vector2(clampf(pos.x+ahead,32,928),FLOOR)
     swing_t=0
     next_foot=1-index
+func pursuit_jump()->void:
+    launch(470.0)
+    launched=false
+    pursuing=true
+    jump_latch=true
 func launch(speed:float)->void:
+    pursuing=false
+    slammed=false
     takeoff_feet.clear()
     for foot in feet:takeoff_feet.append(Vector2((foot.x-pos.x)*facing,foot.y-pos.y-2))
     airborne_time=0
@@ -114,7 +123,11 @@ func tick(input:Dictionary,opponent_x:float)->void:
         airborne_time=0
         swing=-1
     jump_latch=jump
-    if not grounded:velocity.y+=GRAVITY*DT
+    if not grounded:
+        if input.get("air_follow",false) and pursuing:
+            velocity.x=move_toward(velocity.x,float(input.air_vx),3200.0*DT)
+            velocity.y=move_toward(velocity.y,float(input.air_vy),3600.0*DT)
+        else:velocity.y+=GRAVITY*DT
     pos+=velocity*DT
     pos.x=clampf(pos.x,48,912)
     if pos.x<=48 or pos.x>=912:velocity.x=0
@@ -123,6 +136,8 @@ func tick(input:Dictionary,opponent_x:float)->void:
         velocity.y=0
         grounded=true
         launched=false
+        pursuing=false
+        slammed=false
         land=1
         _plant()
     land=move_toward(land,0,DT*6)

@@ -54,5 +54,18 @@ func _run()->void:
             check_rig(w.rig_a)
             check_rig(w.rig_b)
         if w.launches!=1:errors+=1
+    for mirror in [false,true]:
+        var w=W.new()
+        w.a.separate(150)
+        w.b.separate(w.a.pos.x+60-w.b.pos.x)
+        w.rig_a.sample(w.a)
+        w.rig_b.sample(w.b)
+        var seq=preload("res://tests/air_input.gd").new()
+        for i in range(300):
+            var inp:Dictionary=seq.next(w,mirror)
+            w.tick({} if mirror else inp,inp if mirror else {})
+            check_rig(w.rig_a)
+            check_rig(w.rig_b)
+        if w.air_hits!=3:errors+=1
     print("N skin contours checked: ",checked,"; failures: ",errors)
     quit(0 if errors==0 else 1)

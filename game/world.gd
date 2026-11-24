@@ -8,6 +8,9 @@ var hits:int=0
 var blocks:int=0
 var parries:int=0
 var launches:int=0
+var pursuits:int=0
+var air_hits:int=0
+var slams:int=0
 var last_result:String=""
 var freeze:int=0
 var frozen_ticks:int=0
@@ -37,6 +40,8 @@ func tick(left:Dictionary,right:Dictionary)->void:
         frozen_ticks+=1
         ticks+=1
         return
+    _try_pursuit(left,jab_a,a,b)
+    _try_pursuit(right,jab_b,b,a)
     jab_a.tick(a)
     jab_b.tick(b)
     var prev_a:Vector2=jab_a.contact_point(rig_a,a.facing)
@@ -89,10 +94,30 @@ func _resolve(src,dst,attack,defender,contact:Dictionary,profile:Dictionary,resu
         _:
             hits+=1
             if profile.has("lift"):launches+=1
+            if profile.has("juggle") or profile.has("slam"):air_hits+=1
+            if profile.has("slam"):slams+=1
             defender.receive(dst,src.facing,profile,last_lever)
             return int(profile.freeze)
 
+func _try_pursuit(input:Dictionary,j,m,target)->void:
+    if not input.get("jump",false) or not m.grounded or j.hurt>0 or j.hp<=0:return
+    if j.kind!="launcher" or j.age<0 or not j.contact_hit or not target.launched or target.grounded:return
+    if absf(target.pos.x-m.pos.x)>150 or target.velocity.y>120:return
+    j.start_pursuit(m)
+    pursuits+=1
+
 func _motor_input(input:Dictionary,j,m,opponent)->Dictionary:
+    if m.pursuing and j.airborne_attack() and not opponent.grounded and opponent.launched and not (j.kind=="air_slam" and j.connected):
+        var gap:float=(opponent.pos.x-m.pos.x)*m.facing
+        var goal:float=58.0 if j.kind!="air_slam" else 48.0
+        var vx:float=clampf((gap-goal)*12.0+opponent.velocity.x*m.facing,0,300)*m.facing
+        var offset:float=-26.0 if j.kind=="air_slam" else 0.0
+        var vy:float=clampf(opponent.velocity.y+(opponent.pos.y+offset-m.pos.y)*14.0,-510,300)
+        return {"lock_facing":true,"air_follow":true,"air_vx":vx,"air_vy":vy}
+    if m.pursuing:
+        m.pursuing=false
+        return {"lock_facing":true}
+
     # Bounded authored pursuit, only on confirmed linked hand attacks. No teleport or magnetic hit.
     if j.finish_pending>0:return {"lock_facing":true,"settle_kick":true}
     if j.age>=0 and j.kind in ["cross","hook","launcher"]:
@@ -112,6 +137,7 @@ func _motor_input(input:Dictionary,j,m,opponent)->Dictionary:
 
 func _contact(src,dst,attack,defender,previous:Vector2,source_rig,target_rig)->Dictionary:
     if not attack.active() or defender.hp<=0:return {}
+    if attack.airborne_attack() and (src.grounded or dst.grounded or not dst.launched):return {}
     if (dst.pos.x-src.pos.x)*src.facing<=0:return {}
     var p:Vector2=attack.contact_point(source_rig,src.facing)
     # Sweep the visible striking extremity against sampled torso capsule.
