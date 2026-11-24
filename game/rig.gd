@@ -27,11 +27,11 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
     var moving:float=clampf(m.gait,0,1) if m.grounded else 1.0
     var fast:float=m.run_mix
     var backward:bool=relative<-.1
-    var travel_lean:float=3.0 if backward else lerpf(8.0,23.0,fast)
+    var travel_lean:float=3.0 if backward else lerpf(8.0,31.0,fast)
     var lean:float=lerpf(float(g.torso),travel_lean,moving)
     var hip_x:float=lerpf(float(g.hip.x),0,moving)
     var step_u:float=m.swing_t/m.swing_duration if m.swing>=0 else 0.0
-    var bounce:float=sin(step_u*PI)*lerpf(2.0,5.0,fast)*moving
+    var bounce:float=sin(step_u*PI)*lerpf(2.0,3.5,fast)*moving
     var hip_y:float=lerpf(float(g.hip.y),-51.0-bounce,moving)+9*m.land
     lean+=12*m.land
     if not m.grounded:
@@ -54,7 +54,7 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
     lean=clampf(lean+reaction.x,-55,55)
     var hip:=Vector2(hip_x,hip_y)
     var chest:=hip+Vector2(0,-TORSO).rotated(deg_to_rad(lean))
-    var head:=chest+Vector2(0,-NECK).rotated(deg_to_rad(clampf(lerpf(float(g.head),(lean-reaction.x)*.6,moving)+reaction.y,-45,60)))
+    var head:=chest+Vector2(0,-NECK).rotated(deg_to_rad(clampf(lerpf(float(g.head),(lean-reaction.x)*lerpf(.6,.27,fast),moving)+reaction.y,-45,60)))
     var local:Dictionary={"hips":hip,"chest":chest,"head":head}
     for i in range(2):
         var side:String="near" if i==0 else "far"

@@ -4,7 +4,7 @@ const STANCE=preload("res://game/guard_pose.gd")
 const FLOOR=430.0
 const DT=1.0/120.0
 const WALK=135.0
-const RUN=215.0
+const RUN=240.0
 const GRAVITY=1000.0
 const JUMP=395.0
 const ACCEL=1150.0
@@ -48,9 +48,11 @@ func _begin_step(index:int,axis:float)->void:
     # Freeze the step duration at lift-off; changing Shift mid-step cannot snap a foot.
     var moving:bool=absf(axis)>.01
     var fast:bool=moving and sprint and axis*facing>0
-    swing_duration=.13 if fast else (.18 if moving else .15)
-    swing_height=23.0 if fast else (10.0 if moving else 6.0)
-    var ahead:float=signf(axis)*(17.0+absf(axis)*swing_duration)
+    swing_duration=.21 if fast else (.18 if moving else .15)
+    swing_height=26.0 if fast else (10.0 if moving else 6.0)
+    # Aim ahead of the future root, not the root at lift-off.
+    var reach:float=20.0+clampf(absf(velocity.x)*swing_duration,12.0,44.0) if fast else 17.0
+    var ahead:float=signf(axis)*reach
     if not moving:ahead=(STANCE.HALF_WIDTH if index==0 else -STANCE.HALF_WIDTH)*facing
     swing_to=Vector2(clampf(pos.x+ahead,32,928),FLOOR)
     swing_t=0
@@ -74,7 +76,8 @@ func tick(input:Dictionary,opponent_x:float)->void:
     # Backpedal in guard rather than playing a forward sprint backwards.
     var backward:bool=axis*facing<0
     var target:float=axis*(96.0 if backward else (RUN if sprint else WALK))
-    velocity.x=move_toward(velocity.x,target,DT*(550.0 if input.get("hurt",false) else (BRAKE if absf(axis)<.01 else ACCEL)))
+    if input.get("combo_follow",false):target=axis*165.0
+    velocity.x=move_toward(velocity.x,target,DT*(550.0 if input.get("hurt",false) else (BRAKE if absf(axis)<.01 else (1900.0 if input.get("combo_follow",false) else ACCEL))))
     if grounded and jump and not jump_latch:
         takeoff_feet.clear()
         for foot in feet:takeoff_feet.append(Vector2((foot.x-pos.x)*facing,foot.y-pos.y-2))

@@ -1,9 +1,9 @@
 extends RefCounted
 ## Front kick, right-facing local targets. Rear foot stays planted.
 ## Based on chamber/extension/retraction silhouettes in Martial Arts front_kick.
-const DURATION=84
-const ACTIVE_FROM=24
-const ACTIVE_TO=34
+const DURATION=64
+const ACTIVE_FROM=19
+const ACTIVE_TO=26
 const DAMAGE=18
 const KNOCKBACK=195.0
 const HURT=40
@@ -21,13 +21,14 @@ const KEYS=[
     [84,0.0,Vector2(0,-50),0.0,Vector2(22,0),Vector2(7,10),Vector2(24,-2)]
 ]
 static func pose(tick:int)->Dictionary:
+    var pose_tick:float=float(tick)*84.0/DURATION
     var a:Array=KEYS[0]
     var b:Array=KEYS[1]
     for i in range(1,KEYS.size()):
-        if tick<=int(KEYS[i][0]):
+        if pose_tick<=float(KEYS[i][0]):
             a=KEYS[i-1]
             b=KEYS[i]
             break
-    var u:float=clampf(float(tick-int(a[0]))/float(int(b[0])-int(a[0])),0,1)
+    var u:float=clampf((pose_tick-float(a[0]))/float(int(b[0])-int(a[0])),0,1)
     u=u*u*(3-2*u)
     return {"weight":lerpf(float(a[1]),float(b[1]),u),"hip":Vector2(a[2]).lerp(b[2],u),"lean":lerpf(float(a[3]),float(b[3]),u),"lead":Vector2(a[4]).lerp(b[4],u),"rear":Vector2(a[5]).lerp(b[5],u),"kick_foot":Vector2(a[6]).lerp(b[6],u)}

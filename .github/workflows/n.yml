@@ -39,6 +39,8 @@ jobs:
           if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-kick.log; then exit 1; fi
           timeout 30s godot --headless --script res://tests/defense.gd 2>&1 | tee /tmp/n-defense.log
           if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-defense.log; then exit 1; fi
+          timeout 30s godot --headless --script res://tests/chain.gd 2>&1 | tee /tmp/n-chain.log
+          if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-chain.log; then exit 1; fi
           timeout 60s godot --headless --script res://tests/skin.gd 2>&1 | tee /tmp/n-skin.log
           if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-skin.log; then exit 1; fi
           timeout 180s xvfb-run -a godot --audio-driver Dummy --resolution 960x540 --script res://tests/visual.gd 2>&1 | tee /tmp/n-visual.log
@@ -56,6 +58,7 @@ jobs:
           test "$(find reports/run_old_skin -name '*.png' | wc -l)" -eq 36
           for kind in kick_hit kick_miss kick_mirror; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 45; done
           for kind in block parry_counter; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 52; done
+          for kind in chain chain_mirror; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 60; done
           rm -rf .godot
           find . -name '*.import' -delete
           printf '%s\n' "$GITHUB_SHA" > REVISION.txt
@@ -66,7 +69,7 @@ jobs:
           path: /tmp/n-*.log
       - uses: actions/upload-artifact@v4
         with:
-          name: N-0.08-Godot
+          name: N-0.09a-Godot
           path: |
             project.godot
             game/

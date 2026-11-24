@@ -37,3 +37,6 @@ N 0.07 imported from Mefits/pixelfxGadot@5f0e077d3fd73bb280327ef617be9359a52cd58
 
 ## 0.08
 Ground guard and timed parry, mirrored contacts, no guard cancel during attack, no defense in air or against rear contact, counter opportunity, no events on whiff; regression and real block/parry counter capture. Keep existing attack profiles, physical reaction and skin unchanged.
+
+## 0.09a
+Retimed baseline attacks and sprint stride, first three-hit grounded string. Test run support, cadence, old contacts/defense at new timings, chain hit-confirm, buffered transition, mirrored string, interruption and whiff. Capture real chain frames. No air/combo finisher yet.

@@ -42,8 +42,8 @@ func tick(left:Dictionary,right:Dictionary)->void:
     var prev_b:Vector2=jab_b.contact_point(rig_b,b.facing)
     var ax:float=a.pos.x
     var bx:float=b.pos.x
-    a.tick(_motor_input(left,jab_a),bx)
-    b.tick(_motor_input(right,jab_b),ax)
+    a.tick(_motor_input(left,jab_a,a,b),bx)
+    b.tick(_motor_input(right,jab_b,b,a),ax)
     if absf(a.pos.y-b.pos.y)<70 and absf(a.pos.x-b.pos.x)<38:
         var sign0:float=1 if ax<=bx else -1
         var mid:float=clampf((a.pos.x+b.pos.x)*.5,67,893)
@@ -71,6 +71,7 @@ func tick(left:Dictionary,right:Dictionary)->void:
 
 func _resolve(src,dst,attack,defender,contact:Dictionary,profile:Dictionary,result:String)->int:
     attack.connected=true
+    attack.contact_hit=result=="hit"
     last_contact=contact.point
     last_lever=float(contact.lever)
     last_result=result
@@ -89,7 +90,11 @@ func _resolve(src,dst,attack,defender,contact:Dictionary,profile:Dictionary,resu
             defender.receive(dst,src.facing,profile,last_lever)
             return int(profile.freeze)
 
-func _motor_input(input:Dictionary,j)->Dictionary:
+func _motor_input(input:Dictionary,j,m,opponent)->Dictionary:
+    # Bounded authored pursuit, only on confirmed linked hand attacks. No teleport or magnetic hit.
+    if j.age>=0 and j.kind in ["cross","hook"]:
+        var gap:float=(opponent.pos.x-m.pos.x)*m.facing
+        return {"lock_facing":true,"combo_follow":true,"move":float(m.facing) if gap>49 and gap<115 and absf(opponent.pos.y-m.pos.y)<45 else 0.0}
     if j.guarding:return {"lock_facing":true,"hurt":j.blockstun>0}
     if j.kicking():return {"lock_facing":true,"kick_support":true}
     if j.kick_pending>0:return {"settle_kick":true,"lock_facing":true}

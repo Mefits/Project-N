@@ -91,8 +91,22 @@ func _run()->void:
                     if motion.a.swing!=idx:
                         check(motion.rig_a.points["foot_"+side].distance_to(motion.a.feet[idx]-Vector2(0,2))<.5,"Support reach "+mode)
         check(peak>90 and motion.a.steps>3,"Motion "+mode)
-        if mode=="run":check(peak>200 and lift>18,"Running cadence and lift")
+        if mode=="run":check(peak>230 and lift>22,"Running cadence and lift")
         if mode=="back":check(motion.a.pos.x<origin-80 and motion.a.facing==1 and peak<100,"Backpedal preserves guard")
+    var runner=W.new()
+    runner.a.separate(-120)
+    runner.b.separate(220)
+    var last_step:int=0
+    var step_ticks:Array[int]=[]
+    for i in range(240):
+        runner.tick({"move":1,"run":true},{})
+        if runner.a.steps>last_step:
+            if i>70:step_ticks.append(i)
+            last_step=runner.a.steps
+    check(step_ticks.size()>=5,"Sustained run steps")
+    for i in range(1,step_ticks.size()):
+        check(step_ticks[i]-step_ticks[i-1]>=23,"No short sprint cadence")
+    print("N run steady contact ticks: ",step_ticks)
     var transition=W.new()
     for i in range(35):transition.tick({"move":1},{})
     var duration:float=transition.a.swing_duration
