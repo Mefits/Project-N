@@ -119,7 +119,7 @@ func air_sequence(scene,name:String,mirror:bool=false)->void:
         scene._hud()
         scene.queue_redraw()
         await capture(name+"/frame_%03d"%frame)
-    if scene.world.air_hits!=3 or scene.world.slams!=1 or scene.world.hits!=7:push_error("Air capture mismatch "+name);quit(1)
+    if scene.world.air_hits!=3 or scene.world.slams!=1 or scene.world.ground_impacts!=1 or scene.world.hits!=7:push_error("Air capture mismatch "+name);quit(1)
 func check_skin(scene,state:Dictionary,tick0:int)->void:
     if scene.world.ticks!=tick0 or scene.world.rig_a.points!=state:
         push_error("Skin altered simulation")

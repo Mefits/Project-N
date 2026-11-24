@@ -7,24 +7,24 @@ const CANCEL=15
 const FIRST=[
     [0,1.0,Vector2(0,-49),15.0,Vector2(18,1),Vector2(7,8),Vector2(21,-20),Vector2(-20,-12)],
     [5,1.0,Vector2(-3,-48),-9.0,Vector2(10,3),Vector2(9,10),Vector2(16,-25),Vector2(-15,-8)],
-    [9,1.0,Vector2(7,-49),23.0,Vector2(43,1),Vector2(5,10),Vector2(22,-22),Vector2(-24,-7)],
-    [13,1.0,Vector2(8,-49),25.0,Vector2(44,3),Vector2(7,10),Vector2(23,-22),Vector2(-23,-7)],
+    [9,1.0,Vector2(7,-49),23.0,Vector2(43,1),Vector2(5,10),Vector2(29,-29),Vector2(-30,-5)],
+    [13,1.0,Vector2(8,-49),25.0,Vector2(44,3),Vector2(7,10),Vector2(28,-28),Vector2(-29,-6)],
     [18,1.0,Vector2(3,-48),11.0,Vector2(25,7),Vector2(9,10),Vector2(18,-25),Vector2(-16,-10)],
     [27,0.0,Vector2(0,-50),0.0,Vector2(20,0),Vector2(7,10),Vector2(24,-2),Vector2(-24,-2)]
 ]
 const SECOND=[
     [0,1.0,Vector2(3,-48),12.0,Vector2(25,7),Vector2(9,10),Vector2(18,-25),Vector2(-16,-10)],
     [5,1.0,Vector2(-3,-46),-14.0,Vector2(12,6),Vector2(-12,5),Vector2(9,-27),Vector2(-23,-6)],
-    [9,1.0,Vector2(7,-49),30.0,Vector2(7,10),Vector2(40,19),Vector2(24,-15),Vector2(-19,-22)],
-    [13,1.0,Vector2(8,-49),33.0,Vector2(8,11),Vector2(41,18),Vector2(26,-12),Vector2(-18,-22)],
+    [9,1.0,Vector2(7,-49),30.0,Vector2(7,10),Vector2(40,19),Vector2(12,-12),Vector2(-28,-35)],
+    [13,1.0,Vector2(8,-49),33.0,Vector2(8,11),Vector2(41,18),Vector2(15,-9),Vector2(-26,-32)],
     [18,1.0,Vector2(2,-48),12.0,Vector2(11,8),Vector2(25,10),Vector2(18,-20),Vector2(-14,-18)],
     [27,0.0,Vector2(0,-50),0.0,Vector2(20,0),Vector2(7,10),Vector2(24,-2),Vector2(-24,-2)]
 ]
 const DOWN=[
     [0,1.0,Vector2(1,-48),10.0,Vector2(14,2),Vector2(22,4),Vector2(18,-22),Vector2(-16,-18)],
-    [5,1.0,Vector2(-2,-48),-13.0,Vector2(10,-32),Vector2(8,1),Vector2(10,-29),Vector2(-19,-15)],
-    [10,1.0,Vector2(8,-47),35.0,Vector2(35,27),Vector2(3,13),Vector2(22,-22),Vector2(-22,-9)],
-    [15,1.0,Vector2(9,-46),40.0,Vector2(25,36),Vector2(5,15),Vector2(17,-25),Vector2(-21,-8)],
+    [5,1.0,Vector2(-2,-48),-13.0,Vector2(10,-32),Vector2(8,1),Vector2(12,-35),Vector2(-24,-27)],
+    [10,1.0,Vector2(8,-47),35.0,Vector2(35,27),Vector2(3,13),Vector2(26,-33),Vector2(-28,-16)],
+    [15,1.0,Vector2(9,-46),40.0,Vector2(25,36),Vector2(5,15),Vector2(22,-36),Vector2(-30,-10)],
     [22,1.0,Vector2(3,-49),20.0,Vector2(16,19),Vector2(6,12),Vector2(19,-14),Vector2(-17,-5)],
     [38,0.0,Vector2(0,-50),0.0,Vector2(20,0),Vector2(7,10),Vector2(24,-2),Vector2(-24,-2)]
 ]

@@ -53,3 +53,6 @@ Optional pursuit, linked aerial lead/rear/downward strikes. Verify 7 actual cont
 0.10 tuning: first CI confirmed the first air hit but second missed; narrower cross and slam approach goals, vertical offset and upward wrist path. Keep actual contact radius unchanged.
 
 Trace showed cross fist 20–25 px above target chest; retarget down toward torso, reduce vertical follow offset. No hit radius change.
+
+## 0.10.1
+Aerial pose polish, attacker descent on confirmed slam, one floor impact, prone hold and rise, recovery. Same air sequence and 112-frame captures for A/B; preserve damage and collision geometry. CI requires verified landing timing and no extra hits.

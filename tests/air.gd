@@ -30,6 +30,13 @@ func execute(w,mirror:bool=false,follow:bool=true,finish:bool=true,guard:bool=fa
     var old_air_hits:int=0
     var old_launches:int=0
     var landing_ticks:int=0
+    var slam_tick:int=-1
+    var victim_landing:int=-1
+    var attacker_landing:int=-1
+    var down_frames:int=0
+    var horizontal_frames:int=0
+    var min_head_y:float=999
+    var max_head_y:float=0
     for i in range(420):
         var inp:Dictionary=seq.next(w,mirror,follow,finish)
         var old_src:Vector2=src.pos
@@ -51,7 +58,22 @@ func execute(w,mirror:bool=false,follow:bool=true,finish:bool=true,guard:bool=fa
             old_air_hits=w.air_hits
         if w.slams>old_slams:
             slam_velocity=dst.velocity.y
+            slam_tick=i
+            check(src.diving and src.velocity.y>=540,"Attacker fast descent after finisher")
             old_slams=w.slams
+        if slam_tick>=0 and src.grounded and attacker_landing<0:attacker_landing=i
+        if slam_tick>=0 and dst.grounded and victim_landing<0:victim_landing=i
+        if dst.down_ticks>0:
+            down_frames+=1
+            check(dst.grounded and b.locked() and dst.velocity.length()<.001,"Downed control locked")
+            var dp:Dictionary=(w.rig_a if mirror else w.rig_b).points
+            var axis:Vector2=dp.chest-dp.hips
+            if absf(axis.x)>absf(axis.y):horizontal_frames+=1
+            min_head_y=minf(min_head_y,dp.head.y)
+            max_head_y=maxf(max_head_y,dp.head.y)
+            for key in dp:check(dp[key].y<=M.FLOOR+.01,"Downed joint floor safety")
+            check(absf(dp.chest.distance_to(dp.hips)-R.TORSO)<.001,"Downed torso length")
+            check(absf(dp.head.distance_to(dp.chest)-R.NECK)<.001,"Downed neck length")
         if w.slams>0 and dst.grounded:
             slam_landed=true
             landing_ticks+=1
@@ -75,7 +97,11 @@ func execute(w,mirror:bool=false,follow:bool=true,finish:bool=true,guard:bool=fa
         check(kinds.has("air_jab") and kinds.has("air_cross"),"Distinct aerial attacks")
         if finish:
             check(w.slams==1 and slam_velocity>=600 and slam_landed,"Downward strike and landing")
-        else:check(w.slams==0,"No automatic finisher")
+            check(w.ground_impacts==1 and dst.impact_speed>=650,"One actual floor impact")
+            check(attacker_landing>=0 and attacker_landing-slam_tick<45 and abs(attacker_landing-victim_landing)<24,"Attacker lands promptly")
+            check(down_frames>=M.DOWN_TICKS and horizontal_frames>=25 and max_head_y-min_head_y>35,"Prone hold and getup")
+            print("N landing: victim ",victim_landing-slam_tick," ticks; attacker ",attacker_landing-slam_tick," ticks; down ",down_frames,"; horizontal ",horizontal_frames,"; impact ",dst.impact_speed)
+        else:check(w.slams==0 and w.ground_impacts==0,"No automatic finisher")
         check(peak<180 and min_gap>=37.9,"Bounded air following")
         check(src.grounded and dst.grounded and not src.pursuing and not dst.launched and not a.locked() and not b.locked(),"Both recover")
     else:check(w.hits==4 and w.pursuits==0 and w.air_hits==0,"Optional chase")

@@ -11,6 +11,7 @@ var launches:int=0
 var pursuits:int=0
 var air_hits:int=0
 var slams:int=0
+var ground_impacts:int=0
 var last_result:String=""
 var freeze:int=0
 var frozen_ticks:int=0
@@ -57,6 +58,7 @@ func tick(left:Dictionary,right:Dictionary)->void:
         b.separate(mid+sign0*19-b.pos.x)
         if a.velocity.x*sign0>0:a.velocity.x=0
         if b.velocity.x*sign0<0:b.velocity.x=0
+    ground_impacts=a.ground_impacts+b.ground_impacts
     rig_a.sample(a,jab_a.pose(hybrid_enabled),jab_a.reaction.angles if hybrid_enabled else Vector4.ZERO)
     rig_b.sample(b,jab_b.pose(hybrid_enabled),jab_b.reaction.angles if hybrid_enabled else Vector4.ZERO)
     # Snapshot contacts and attack parameters before applying either hit.
@@ -95,7 +97,9 @@ func _resolve(src,dst,attack,defender,contact:Dictionary,profile:Dictionary,resu
             hits+=1
             if profile.has("lift"):launches+=1
             if profile.has("juggle") or profile.has("slam"):air_hits+=1
-            if profile.has("slam"):slams+=1
+            if profile.has("slam"):
+                slams+=1
+                src.dive()
             defender.receive(dst,src.facing,profile,last_lever)
             return int(profile.freeze)
 
@@ -107,6 +111,7 @@ func _try_pursuit(input:Dictionary,j,m,target)->void:
     pursuits+=1
 
 func _motor_input(input:Dictionary,j,m,opponent)->Dictionary:
+    if m.down_ticks>0 or m.dive_landing>0 or m.diving:return {"lock_facing":true}
     if m.pursuing and j.airborne_attack() and not opponent.grounded and opponent.launched and not (j.kind=="air_slam" and j.connected):
         var gap:float=(opponent.pos.x-m.pos.x)*m.facing
         var goal:float=48.0 if j.kind=="air_cross" else (43.0 if j.kind=="air_slam" else 58.0)
@@ -136,7 +141,7 @@ func _motor_input(input:Dictionary,j,m,opponent)->Dictionary:
     return {"lock_facing":true,"hurt":j.hurt>0 or j.hp<=0}
 
 func _contact(src,dst,attack,defender,previous:Vector2,source_rig,target_rig)->Dictionary:
-    if not attack.active() or defender.hp<=0:return {}
+    if not attack.active() or defender.hp<=0 or dst.down_ticks>0:return {}
     if attack.airborne_attack() and (src.grounded or dst.grounded or not dst.launched):return {}
     if (dst.pos.x-src.pos.x)*src.facing<=0:return {}
     var p:Vector2=attack.contact_point(source_rig,src.facing)

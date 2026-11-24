@@ -17,6 +17,14 @@ var grounded:bool=true
 var launched:bool=false
 var pursuing:bool=false
 var slammed:bool=false
+const DOWN_TICKS=60
+const RISE_TICKS=32
+var down_ticks:int=0
+var slam_time:float=0
+var diving:bool=false
+var dive_landing:int=0
+var ground_impacts:int=0
+var impact_speed:float=0
 var feet:Array[Vector2]=[]
 var swing:int=-1
 var next_foot:int=0
@@ -79,6 +87,10 @@ func pursuit_jump()->void:
 func launch(speed:float)->void:
     pursuing=false
     slammed=false
+    diving=false
+    down_ticks=0
+    slam_time=0
+    dive_landing=0
     takeoff_feet.clear()
     for foot in feet:takeoff_feet.append(Vector2((foot.x-pos.x)*facing,foot.y-pos.y-2))
     airborne_time=0
@@ -89,11 +101,27 @@ func launch(speed:float)->void:
     run_flight=false
     released_foot=-1
     flight_lift=0
+func dive()->void:
+    pursuing=false
+    diving=true
+    velocity.y=maxf(velocity.y,540.0)
 func tick(input:Dictionary,opponent_x:float)->void:
     time+=DT
     run_flight=false
     released_foot=-1
     flight_lift=0
+    if down_ticks>0:
+        down_ticks-=1
+        velocity=Vector2.ZERO
+        jump_latch=bool(input.get("jump",false))
+        return
+    if dive_landing>0:
+        dive_landing-=1
+        velocity=Vector2.ZERO
+        land=move_toward(land,0,DT*6)
+        jump_latch=bool(input.get("jump",false))
+        return
+    if slammed and not grounded:slam_time+=DT
     var axis:float=clampf(float(input.get("move",0)),-1,1)
     sprint=bool(input.get("run",false))
     var jump:bool=bool(input.get("jump",false))
@@ -132,14 +160,29 @@ func tick(input:Dictionary,opponent_x:float)->void:
     pos.x=clampf(pos.x,48,912)
     if pos.x<=48 or pos.x>=912:velocity.x=0
     if not grounded and pos.y>=FLOOR:
+        var was_slammed:bool=slammed
+        var was_diving:bool=diving
+        if was_slammed:
+            ground_impacts+=1
+            impact_speed=velocity.y
+            down_ticks=DOWN_TICKS
+            velocity.x=0
+        if was_diving:
+            dive_landing=12
+            velocity.x=0
         pos.y=FLOOR
         velocity.y=0
         grounded=true
         launched=false
         pursuing=false
         slammed=false
+        diving=false
         land=1
         _plant()
+        if was_slammed or was_diving:
+            gait=0
+            run_mix=0
+            return
     land=move_toward(land,0,DT*6)
     if not grounded:
         airborne_time+=DT

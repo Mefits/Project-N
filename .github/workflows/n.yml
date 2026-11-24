@@ -76,7 +76,7 @@ jobs:
           path: /tmp/n-*.log
       - uses: actions/upload-artifact@v4
         with:
-          name: N-0.10-Godot
+          name: N-0.10.1-Godot
           path: |
             project.godot
             game/

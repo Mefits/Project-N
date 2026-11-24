@@ -5,6 +5,8 @@ extends RefCounted
 static func air(m,side:int)->Dictionary:
     var s:float=1.0 if side==0 else -1.0
     var t:float=m.airborne_time
+    if m.diving:
+        return {"foot":Vector2(14 if side==0 else -20,-13 if side==0 else -6),"hand":Vector2(21 if side==0 else -5,18 if side==0 else 14),"lean":24.0,"hip_y":-48.0,"phase":0.0}
     if m.launched:
         var tuck_launch:float=smoothstep(0.0,.13,t)*(1.0-smoothstep(.60,.86,t))
         var start:Vector2=Vector2(s*24,-2)
@@ -28,3 +30,7 @@ static func arm_target(stride:float,run:float,side:int)->Vector2:
     var upper:float=stride*lerpf(24.0,61.0,run)
     var elbow:float=lerpf(35.0,77.0,run)
     return Vector2(0,22).rotated(deg_to_rad(upper))+Vector2(0,23).rotated(deg_to_rad(upper-elbow))
+
+static func floor_shift(root_y:float,bottom:float,down:bool,weight:float)->float:
+    var gap:float=430.0-root_y-bottom
+    return gap*weight if down and gap>0 else minf(0.0,gap)

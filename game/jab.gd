@@ -133,6 +133,17 @@ func profile()->Dictionary:
 func tick(m)->void:
     reaction.step()
     if hurt>0:hurt-=1
+    if m.down_ticks>0 or m.dive_landing>0:
+        hurt=maxi(hurt,m.down_ticks)
+        age=-1
+        chain_buffer=0
+        chain_count=0
+        transition_pose={}
+        queued=false
+        guarding=false
+        guard_blend=0
+        parry_left=0
+        return
     if airborne_attack() and (m.grounded or not m.pursuing):
         age=-1
         chain_buffer=0
@@ -309,7 +320,9 @@ func pose(hybrid:bool=false)->Dictionary:
         var u:float=float(hurt)/hurt_total
         if hurt_style in ["air_jab","air_cross","air_slam"]:
             var slam:bool=hurt_style=="air_slam"
-            return {"weight":u*.85,"hip":Vector2(-4,-44 if slam else -49),"lean":38.0 if slam else -24.0,"lead":Vector2(12,25),"rear":Vector2(-10,19),"twist":.6,"air_near":Vector2(22,-14),"air_far":Vector2(-18,-22)}
+            var cross:bool=hurt_style=="air_cross"
+            var snap:float=smoothstep(0.0,.12,1.0-u)*(1.0-smoothstep(.12,.42,1.0-u))
+            return {"weight":u*.85,"hip":Vector2(-4,-44 if slam else -49),"lean":38.0 if slam else -24.0,"lead":Vector2(-7,29) if cross else Vector2(12,25)+Vector2(8,-12)*snap,"rear":Vector2(21,6) if cross else Vector2(-10,19)+Vector2(-10,5)*snap,"twist":.6,"air_near":Vector2(8,-32) if cross else Vector2(22,-14)+Vector2(8,-9)*snap,"air_far":Vector2(-29,-5) if cross else Vector2(-18,-22)}
         if hurt_style=="launcher":
             return {"weight":u*(.75 if hybrid else 1.0),"hip":Vector2(-3,-48),"lean":-30.0,"lead":Vector2(5,21),"rear":Vector2(-9,15),"twist":.55}
         if hurt_style in ["cross","hook","finisher"]:

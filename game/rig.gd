@@ -39,6 +39,9 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
         var ap:Dictionary=MOTION.air(m,0)
         lean=float(ap.lean)
         hip_y=float(ap.hip_y)
+    var down:float=smoothstep(0.0,float(m.RISE_TICKS),float(m.down_ticks))
+    if m.down_ticks>0:
+        action={"weight":down,"hip":Vector2(0,-46),"lean":0.0,"lead":Vector2(14,24),"rear":Vector2(-17,13)}
     var weight:float=float(action.get("weight",0))
     if weight>0:
         hip_x=lerpf(hip_x,float(action.hip.x),weight)
@@ -90,6 +93,20 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
         local["thigh_"+side]=thigh
         local["knee_"+side]=leg[0]
         local["foot_"+side]=leg[1]
+    # Rotate the whole skeleton, preserving every bone length. On landing, fit
+    # the silhouette against the floor rather than planting upright feet.
+    var fall:float=down if m.down_ticks>0 else (smoothstep(0.0,.13,m.slam_time) if m.slammed else 0.0)
+    if fall>0:
+        var angle:float=deg_to_rad(-88.0*fall)
+        var pivot:Vector2=local.hips
+        var bottom:float=-INF
+        for key in local:
+            var v:Vector2=pivot+(Vector2(local[key])-pivot).rotated(angle)
+            local[key]=v
+            var margin:float=13.0 if key=="head" else (9.0 if key in ["hips","chest"] else (2.0 if str(key).begins_with("foot") else 6.0))
+            bottom=maxf(bottom,v.y+margin)
+        var floor_shift:float=MOTION.floor_shift(m.pos.y,bottom,m.down_ticks>0,fall)
+        for key in local:local[key].y+=floor_shift
     points={}
     for key in local:
         var p:Vector2=local[key]
