@@ -99,14 +99,14 @@ func _unhandled_key_input(e:InputEvent)->void:
 func _held(key:Key)->bool:return Input.is_physical_key_pressed(key)
 func _physics_process(dt:float)->void:
     if paused:return
-    var left:Dictionary={"move":float(_held(KEY_D))-float(_held(KEY_A)),"jump":_held(KEY_W),"run":_held(KEY_SHIFT),"jab":_held(KEY_F),"heavy":_held(KEY_H),"kick":_held(KEY_J),"guard":_held(KEY_S)}
-    var right:Dictionary={"jab":dummy_jab} if single_player else {"move":float(_held(KEY_RIGHT))-float(_held(KEY_LEFT)),"jump":_held(KEY_UP),"run":_held(KEY_CTRL),"jab":_held(KEY_K),"heavy":_held(KEY_L),"kick":_held(KEY_SEMICOLON),"guard":_held(KEY_DOWN)}
+    var left:Dictionary={"move":float(_held(KEY_D))-float(_held(KEY_A)),"jump":_held(KEY_W) and not _held(KEY_F),"launch":_held(KEY_W),"run":_held(KEY_SHIFT),"jab":_held(KEY_F),"heavy":_held(KEY_H),"kick":_held(KEY_J),"guard":_held(KEY_S)}
+    var right:Dictionary={"jab":dummy_jab} if single_player else {"move":float(_held(KEY_RIGHT))-float(_held(KEY_LEFT)),"jump":_held(KEY_UP) and not _held(KEY_K),"launch":_held(KEY_UP),"run":_held(KEY_CTRL),"jab":_held(KEY_K),"heavy":_held(KEY_L),"kick":_held(KEY_SEMICOLON),"guard":_held(KEY_DOWN)}
     dummy_jab=false
     world.advance(dt,left,right)
     _hud()
     queue_redraw()
 func _hud()->void:
-    hud.text="A/D — движение · W — прыжок · Shift — бег · F/H/J — удары · S — блок   |   "+("Y — удар манекена · F2 — P2" if single_player else "P2: ←/→ ↑ ↓ · Ctrl · K/L/;")+"\nN  /  0.09b  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · серия "+str(world.jab_a.chain_count)+" · удары "+str(world.hits)+" · блоки "+str(world.blocks)+" · парирования "+str(world.parries)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
+    hud.text="A/D — движение · W — прыжок · Shift — бег · F ×4 · W+F — подброс · S — блок   |   "+("Y — удар манекена · F2 — P2" if single_player else "P2: ←/→ ↑ ↓ · Ctrl · K/L/;")+"\nN  /  0.09c  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · серия "+str(world.jab_a.chain_count)+" · удары "+str(world.hits)+" · подбросы "+str(world.launches)+" · блоки "+str(world.blocks)+" · парирования "+str(world.parries)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
 func _segment(a:Vector2,b:Vector2,width:float,c:Color)->void:
     draw_line(a,b,Color("#17202b"),width+3,true)
     draw_line(a,b,c,width,true)

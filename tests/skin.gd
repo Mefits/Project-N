@@ -38,5 +38,21 @@ func _run()->void:
             w.tick(input,{"guard":mode=="guard"})
             check_rig(w.rig_a)
             check_rig(w.rig_b)
+    for mirror in [false,true]:
+        var w=W.new()
+        w.a.separate(150)
+        w.b.separate(w.a.pos.x+60-w.b.pos.x)
+        w.rig_a.sample(w.a)
+        w.rig_b.sample(w.b)
+        var attacker=w.jab_b if mirror else w.jab_a
+        var sent:int=0
+        for i in range(240):
+            var press:bool=i==0 or (sent==1 and attacker.kind=="jab" and attacker.age>=11) or (sent==2 and attacker.kind=="cross" and attacker.age>=11) or (sent==3 and attacker.kind=="hook" and attacker.age>=11)
+            if press:sent+=1
+            var input:Dictionary={"jab":press,"launch":press and sent==4}
+            w.tick({} if mirror else input,input if mirror else {})
+            check_rig(w.rig_a)
+            check_rig(w.rig_b)
+        if w.launches!=1:errors+=1
     print("N skin contours checked: ",checked,"; failures: ",errors)
     quit(0 if errors==0 else 1)

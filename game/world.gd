@@ -7,6 +7,7 @@ var jab_b=J.new()
 var hits:int=0
 var blocks:int=0
 var parries:int=0
+var launches:int=0
 var last_result:String=""
 var freeze:int=0
 var frozen_ticks:int=0
@@ -29,8 +30,8 @@ func advance(dt:float,left:Dictionary,right:Dictionary)->void:
         tick(left,right)
         accumulator=maxf(0,accumulator-M.DT)
 func tick(left:Dictionary,right:Dictionary)->void:
-    jab_a.capture(bool(left.get("jab",false)),bool(left.get("heavy",false)),bool(left.get("kick",false)),bool(left.get("guard",false)))
-    jab_b.capture(bool(right.get("jab",false)),bool(right.get("heavy",false)),bool(right.get("kick",false)),bool(right.get("guard",false)))
+    jab_a.capture(bool(left.get("jab",false)),bool(left.get("heavy",false)),bool(left.get("kick",false)),bool(left.get("guard",false)),bool(left.get("launch",false)))
+    jab_b.capture(bool(right.get("jab",false)),bool(right.get("heavy",false)),bool(right.get("kick",false)),bool(right.get("guard",false)),bool(right.get("launch",false)))
     if freeze>0:
         freeze-=1
         frozen_ticks+=1
@@ -87,17 +88,19 @@ func _resolve(src,dst,attack,defender,contact:Dictionary,profile:Dictionary,resu
             return J.BLOCK_FREEZE
         _:
             hits+=1
+            if profile.has("lift"):launches+=1
             defender.receive(dst,src.facing,profile,last_lever)
             return int(profile.freeze)
 
 func _motor_input(input:Dictionary,j,m,opponent)->Dictionary:
     # Bounded authored pursuit, only on confirmed linked hand attacks. No teleport or magnetic hit.
     if j.finish_pending>0:return {"lock_facing":true,"settle_kick":true}
-    if j.age>=0 and j.kind in ["cross","hook"]:
+    if j.age>=0 and j.kind in ["cross","hook","launcher"]:
         var gap:float=(opponent.pos.x-m.pos.x)*m.facing
         var goal:float=62.0 if j.kind=="cross" else 59.0
         var approach:float=clampf((gap-goal)/16.0,0,1)
         if gap>115 or absf(opponent.pos.y-m.pos.y)>45:approach=0
+        if j.connected and j.kind=="launcher":approach=0
         if j.connected and j.kind=="cross":approach*=.5
         if j.connected and j.kind=="hook" and j.chain_buffer==0:approach=0
         return {"lock_facing":true,"combo_follow":true,"move":float(m.facing)*approach}

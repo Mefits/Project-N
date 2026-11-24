@@ -5,6 +5,13 @@ extends RefCounted
 static func air(m,side:int)->Dictionary:
     var s:float=1.0 if side==0 else -1.0
     var t:float=m.airborne_time
+    if m.launched:
+        var tuck_launch:float=smoothstep(0.0,.13,t)*(1.0-smoothstep(.60,.86,t))
+        var start:Vector2=Vector2(s*24,-2)
+        if m.takeoff_feet.size()==2:start=m.takeoff_feet[side]
+        var target:Vector2=Vector2(27 if side==0 else -13,-24 if side==0 else -11)
+        var foot:Vector2=start.lerp(target,smoothstep(0.0,.15,t)).lerp(Vector2(s*24,-2),smoothstep(.60,.86,t))
+        return {"foot":foot,"hand":Vector2(5,18),"lean":-28.0*tuck_launch,"hip_y":-50.0+5.0*tuck_launch,"phase":clampf(t/.88,0,1)}
     var phase:float=clampf(t/.78,0,1)
     var takeoff:float=smoothstep(0.0,.12,t)
     var tuck:float=smoothstep(.07,.29,t)*(1.0-smoothstep(.43,.70,t))

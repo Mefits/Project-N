@@ -14,6 +14,7 @@ var pos:Vector2
 var velocity:=Vector2.ZERO
 var facing:int=1
 var grounded:bool=true
+var launched:bool=false
 var feet:Array[Vector2]=[]
 var swing:int=-1
 var next_foot:int=0
@@ -68,6 +69,17 @@ func _begin_step(index:int,axis:float)->void:
     swing_to=Vector2(clampf(pos.x+ahead,32,928),FLOOR)
     swing_t=0
     next_foot=1-index
+func launch(speed:float)->void:
+    takeoff_feet.clear()
+    for foot in feet:takeoff_feet.append(Vector2((foot.x-pos.x)*facing,foot.y-pos.y-2))
+    airborne_time=0
+    velocity.y=-speed
+    grounded=false
+    launched=true
+    swing=-1
+    run_flight=false
+    released_foot=-1
+    flight_lift=0
 func tick(input:Dictionary,opponent_x:float)->void:
     time+=DT
     run_flight=false
@@ -91,7 +103,7 @@ func tick(input:Dictionary,opponent_x:float)->void:
     var backward:bool=axis*facing<0
     var target:float=axis*(96.0 if backward else (RUN if sprint else WALK))
     if input.get("combo_follow",false):target=axis*165.0
-    velocity.x=move_toward(velocity.x,target,DT*(550.0 if input.get("hurt",false) else (2600.0 if input.get("combo_follow",false) else (BRAKE if absf(axis)<.01 else ACCEL))))
+    velocity.x=move_toward(velocity.x,target,DT*(90.0 if launched and not grounded else (550.0 if input.get("hurt",false) else (2600.0 if input.get("combo_follow",false) else (BRAKE if absf(axis)<.01 else ACCEL)))))
     if grounded and jump and not jump_latch:
         takeoff_feet.clear()
         for foot in feet:takeoff_feet.append(Vector2((foot.x-pos.x)*facing,foot.y-pos.y-2))
@@ -110,6 +122,7 @@ func tick(input:Dictionary,opponent_x:float)->void:
         pos.y=FLOOR
         velocity.y=0
         grounded=true
+        launched=false
         land=1
         _plant()
     land=move_toward(land,0,DT*6)

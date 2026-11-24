@@ -43,3 +43,6 @@ Retimed baseline attacks and sprint stride, first three-hit grounded string. Tes
 
 ## 0.09b
 Four-hit confirmed string and proportional approach, distinct hurt overlays, gait-only sprint flight. Validate actual contacts, mirrored finisher, support, minimum gap and cadence, capture real frames. Keep old regressions.
+
+## 0.09c
+Alternate rising strike, true ballistic launch and return to ground. Verify mirrored launch, damage, contact gating, hitstop freeze, floor, bone lengths, recovery and previous kick chain; capture normal and mirrored launcher from real Godot. No aerial followup yet.
