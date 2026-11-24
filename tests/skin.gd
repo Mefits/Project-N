@@ -26,7 +26,7 @@ func _run()->void:
         var b:=k+Vector2.from_angle(deg_to_rad(angle))*23
         verify(a,k,b,Vector3(6.7,5,3.8))
         verify(-a,-k,-b,Vector3(6.7,5,3.8))
-    for mode in ["walk","run","jump","jab","heavy","kick","back"]:
+    for mode in ["walk","run","jump","jab","heavy","kick","back","guard"]:
         var w=W.new()
         if mode in ["jab","heavy","kick"]:
             w.a.separate(150)
@@ -35,7 +35,7 @@ func _run()->void:
             w.rig_b.sample(w.b)
         for i in range(160):
             var input:Dictionary={"move":1 if mode in ["walk","run"] and i<100 else (-1 if mode=="back" and i<100 else 0),"run":mode=="run","jump":mode=="jump" and i==5,"jab":mode=="jab" and i==5,"heavy":mode=="heavy" and i==5,"kick":mode=="kick" and i==5}
-            w.tick(input,{})
+            w.tick(input,{"guard":mode=="guard"})
             check_rig(w.rig_a)
             check_rig(w.rig_b)
     print("N skin contours checked: ",checked,"; failures: ",errors)

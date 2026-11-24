@@ -34,3 +34,6 @@ Front kick with rear-foot support and buffered movement transition; validate hit
 
 ## Repository migration
 N 0.07 imported from Mefits/pixelfxGadot@5f0e077d3fd73bb280327ef617be9359a52cd588. Verified source CI: https://github.com/Mefits/pixelfxGadot/actions/runs/45494456164. No gameplay changes. CI now targets main in Mefits/Project-N.
+
+## 0.08
+Ground guard and timed parry, mirrored contacts, no guard cancel during attack, no defense in air or against rear contact, counter opportunity, no events on whiff; regression and real block/parry counter capture. Keep existing attack profiles, physical reaction and skin unchanged.

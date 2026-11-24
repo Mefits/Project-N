@@ -5,6 +5,9 @@ const J=preload("res://game/jab.gd")
 var jab_a=J.new()
 var jab_b=J.new()
 var hits:int=0
+var blocks:int=0
+var parries:int=0
+var last_result:String=""
 var freeze:int=0
 var frozen_ticks:int=0
 var hitstop_enabled:bool=true
@@ -26,8 +29,8 @@ func advance(dt:float,left:Dictionary,right:Dictionary)->void:
         tick(left,right)
         accumulator=maxf(0,accumulator-M.DT)
 func tick(left:Dictionary,right:Dictionary)->void:
-    jab_a.capture(bool(left.get("jab",false)),bool(left.get("heavy",false)),bool(left.get("kick",false)))
-    jab_b.capture(bool(right.get("jab",false)),bool(right.get("heavy",false)),bool(right.get("kick",false)))
+    jab_a.capture(bool(left.get("jab",false)),bool(left.get("heavy",false)),bool(left.get("kick",false)),bool(left.get("guard",false)))
+    jab_b.capture(bool(right.get("jab",false)),bool(right.get("heavy",false)),bool(right.get("kick",false)),bool(right.get("guard",false)))
     if freeze>0:
         freeze-=1
         frozen_ticks+=1
@@ -55,27 +58,39 @@ func tick(left:Dictionary,right:Dictionary)->void:
     var hit_b:Dictionary=_contact(b,a,jab_b,jab_a,prev_b,rig_b,rig_a)
     var profile_a:Dictionary=jab_a.profile()
     var profile_b:Dictionary=jab_b.profile()
+    # Snapshot defensive outcomes too; neither side's mutation changes the other contact.
+    var result_a:String=jab_b.defense(b,a.pos.x) if not hit_a.is_empty() else ""
+    var result_b:String=jab_a.defense(a,b.pos.x) if not hit_b.is_empty() else ""
     var pause_ticks:int=0
-    if not hit_a.is_empty():
-        jab_a.connected=true
-        last_contact=hit_a.point
-        last_lever=float(hit_a.lever)
-        jab_b.receive(b,a.facing,profile_a,last_lever)
-        pause_ticks=maxi(pause_ticks,int(profile_a.freeze))
-        hits+=1
-    if not hit_b.is_empty():
-        jab_b.connected=true
-        last_contact=hit_b.point
-        last_lever=float(hit_b.lever)
-        jab_a.receive(a,b.facing,profile_b,last_lever)
-        pause_ticks=maxi(pause_ticks,int(profile_b.freeze))
-        hits+=1
+    if not hit_a.is_empty():pause_ticks=maxi(pause_ticks,_resolve(a,b,jab_a,jab_b,hit_a,profile_a,result_a))
+    if not hit_b.is_empty():pause_ticks=maxi(pause_ticks,_resolve(b,a,jab_b,jab_a,hit_b,profile_b,result_b))
     if pause_ticks>0:
         if hitstop_enabled:freeze=pause_ticks
         # Contact frame stays visible through freeze; hurt pose starts on next tick.
     ticks+=1
 
+func _resolve(src,dst,attack,defender,contact:Dictionary,profile:Dictionary,result:String)->int:
+    attack.connected=true
+    last_contact=contact.point
+    last_lever=float(contact.lever)
+    last_result=result
+    match result:
+        "parry":
+            parries+=1
+            defender.receive_parry()
+            attack.punish_parried(src,-src.facing)
+            return J.PARRY_FREEZE
+        "block":
+            blocks+=1
+            defender.receive_block(dst,src.facing,profile)
+            return J.BLOCK_FREEZE
+        _:
+            hits+=1
+            defender.receive(dst,src.facing,profile,last_lever)
+            return int(profile.freeze)
+
 func _motor_input(input:Dictionary,j)->Dictionary:
+    if j.guarding:return {"lock_facing":true,"hurt":j.blockstun>0}
     if j.kicking():return {"lock_facing":true,"kick_support":true}
     if j.kick_pending>0:return {"settle_kick":true,"lock_facing":true}
     if not j.locked():return input

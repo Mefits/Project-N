@@ -1,5 +1,5 @@
 extends RefCounted
-## Three authored attacks and optional bounded spring reaction. Fixed 120 Hz.
+## Three authored attacks, basic guard/parry and bounded spring reaction. Fixed 120 Hz.
 const REACTION=preload("res://game/impact_reaction.gd")
 const KICK=preload("res://game/kick_pose.gd")
 const HEAVY_DURATION=80
@@ -38,6 +38,16 @@ const HEAVY_KEYS=[
     [51,1.0,1.0,-49.0,8.0,Vector2(17,5),Vector2(20,13)],
     [80,0.0,0.0,-50.0,0.0,Vector2(20,0),Vector2(7,10)]
 ]
+const PARRY_WINDOW=10
+const PARRY_STUN=36
+const PARRY_FREEZE=9
+const BLOCK_FREEZE=4
+var guard_held:bool=false
+var guard_edge:bool=false
+var guarding:bool=false
+var guard_blend:float=0
+var parry_left:int=0
+var blockstun:int=0
 var reaction=REACTION.new()
 var kind:String="jab"
 var heavy_latch:bool=false
@@ -53,7 +63,9 @@ var attacks:int=0
 var connected:bool=false
 var latch:bool=false
 var queued:bool=false
-func capture(pressed:bool,heavy:bool=false,kick:bool=false)->void:
+func capture(pressed:bool,heavy:bool=false,kick:bool=false,guard:bool=false)->void:
+    if guard and not guard_held:guard_edge=true
+    guard_held=guard
     if kick and not kick_latch:
         queued=true
         queued_kind="kick"
@@ -87,6 +99,17 @@ func tick(m)->void:
     if age>=0:
         age+=1
         if age>=duration():age=-1
+    if blockstun>0:blockstun-=1
+    if parry_left>0:parry_left-=1
+    var eligible:bool=m.grounded and age<0 and hurt==0 and hp>0
+    guarding=eligible and (guard_held or blockstun>0)
+    if guard_edge and guarding and blockstun==0:parry_left=PARRY_WINDOW
+    guard_edge=false
+    if not guarding or not guard_held:parry_left=0
+    guard_blend=move_toward(guard_blend,1.0 if guarding else 0.0,.20)
+    if guarding:
+        queued=false
+        kick_pending=0
     if kick_pending>0:kick_pending-=1
     if not m.grounded or hurt>0 or hp<=0:kick_pending=0
     if queued and hp>0 and hurt==0 and age<0 and m.grounded:
@@ -104,11 +127,39 @@ func tick(m)->void:
         attacks+=1
         kick_pending=0
     queued=false
-func locked()->bool:return age>=0 or hurt>0 or hp<=0
+func locked()->bool:return age>=0 or hurt>0 or hp<=0 or blockstun>0
 func active()->bool:
     if kind=="kick":return age>=KICK.ACTIVE_FROM and age<=KICK.ACTIVE_TO and not connected
     return age>=(HEAVY_ACTIVE_FROM if kind=="heavy" else ACTIVE_FROM) and age<=(HEAVY_ACTIVE_TO if kind=="heavy" else ACTIVE_TO) and not connected
+func defense(m,source_x:float)->String:
+    if not guarding or not m.grounded or (source_x-m.pos.x)*m.facing<=0:return "hit"
+    if parry_left>0 and blockstun==0:return "parry"
+    return "block"
+func receive_block(m,direction:int,attack:Dictionary)->void:
+    parry_left=0
+    blockstun=12 if float(attack.strength)<1.5 else 20
+    m.velocity.x=float(attack.knockback)*.24*direction
+    reaction.impulse(.24,.65,float(direction*m.facing))
+func receive_parry()->void:
+    parry_left=0
+    blockstun=0
+func punish_parried(m,direction:int)->void:
+    age=-1
+    hurt=PARRY_STUN
+    hurt_total=hurt
+    hurt_heavy=false
+    queued=false
+    kick_pending=0
+    guarding=false
+    parry_left=0
+    guard_blend=0
+    m.velocity.x=24.0*direction
+    reaction.impulse(.6,.8,float(direction*m.facing))
 func receive(m,direction:int,attack:Dictionary,lever:float)->void:
+    guarding=false
+    guard_blend=0
+    parry_left=0
+    blockstun=0
     hp=maxi(0,hp-int(attack.damage))
     age=-1
     hurt=int(attack.hurt)
@@ -125,7 +176,11 @@ func pose(hybrid:bool=false)->Dictionary:
             # Small authored loss of balance; actual upper-body motion comes from springs.
             return {"weight":u*.55,"hip":Vector2(-2,-45 if hurt_heavy else -48),"lean":-5.0,"lead":Vector2(16,8),"rear":Vector2(6,12)}
         return {"weight":u,"hip":Vector2(-5,-44) if hurt_heavy else Vector2(-3,-47),"lean":-36.0 if hurt_heavy else -24.0,"lead":Vector2(8,19),"rear":Vector2(-6,20)}
-    if age<0:return {}
+    if age<0:
+        if guard_blend>0:
+            var recoil:float=clampf(float(blockstun)/20,0,1)
+            return {"weight":guard_blend,"hip":Vector2(-2,-48),"lean":3.0-10.0*recoil,"lead":Vector2(24,-7)+Vector2(-5,4)*recoil,"rear":Vector2(17,4)+Vector2(-4,3)*recoil}
+        return {}
     if kind=="kick":return KICK.pose(age)
     var keys:Array=HEAVY_KEYS if kind=="heavy" else KEYS
     var a:Array=keys[0]

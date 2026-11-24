@@ -56,6 +56,30 @@ func kick_sequence(scene,name:String,hit:bool,mirror:bool=false)->void:
         scene.queue_redraw()
         await capture(name+"/frame_%03d"%frame)
     if scene.world.hits!=(1 if hit else 0):push_error("Kick capture contact mismatch "+name);quit(1)
+func defense_sequence(scene,name:String,parry:bool)->void:
+    scene.world=W.new()
+    scene.world.a.separate(150)
+    scene.world.b.separate(scene.world.a.pos.x+60-scene.world.b.pos.x)
+    scene.world.rig_a.sample(scene.world.a)
+    scene.world.rig_b.sample(scene.world.b)
+    scene.debug=false
+    DirAccess.make_dir_recursive_absolute("res://reports/"+name)
+    var counter_sent:bool=false
+    for frame in range(52):
+        for i in range(4):
+            var n:int=frame*4+i
+            var left:Dictionary={"jab":n==24}
+            var right:Dictionary={"guard":n>= (33 if parry else 0) and not counter_sent}
+            if parry and scene.world.parries==1 and not counter_sent and scene.world.freeze==0:
+                right={"jab":true}
+                counter_sent=true
+            scene.world.tick(left,right)
+        scene._hud()
+        scene.queue_redraw()
+        await capture(name+"/frame_%03d"%frame)
+    if parry:
+        if scene.world.parries!=1 or scene.world.hits!=1:push_error("Parry capture mismatch");quit(1)
+    elif scene.world.blocks!=1 or scene.world.hits!=0:push_error("Block capture mismatch");quit(1)
 func check_skin(scene,state:Dictionary,tick0:int)->void:
     if scene.world.ticks!=tick0 or scene.world.rig_a.points!=state:
         push_error("Skin altered simulation")
@@ -114,6 +138,8 @@ func _run()->void:
     await kick_sequence(scene,"kick_hit",true)
     await kick_sequence(scene,"kick_miss",false)
     await kick_sequence(scene,"kick_mirror",true,true)
+    await defense_sequence(scene,"block",false)
+    await defense_sequence(scene,"parry_counter",true)
     var state:Dictionary=scene.world.rig_a.points.duplicate(true)
     var tick0:int=scene.world.ticks
     scene._toggle_skin()
