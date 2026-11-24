@@ -66,7 +66,7 @@ func _attacker(i:int)->Dictionary:
         if c>=i and c-i<=2:
             var u:float=1.0-float(c-i)/3.0
             var strike:String=f.strike
-            p[strike]=Vector2(p[strike]).lerp(f.points[strike],u)
+            p[strike]=f.points[strike] if c==i else Vector2(p[strike]).lerp(f.points[strike],u)
             var j:String=("knee_near" if strike=="foot_near" else ("elbow_near" if strike=="hand_near" else "elbow_far"))
             p[j]=Vector2(p[j]).lerp(f.points[j],u*.45)
     if f.kind=="finisher" and f.age>=46:p=_blend(p,f.points,smoothstep(46.0,55.0,float(f.age)))

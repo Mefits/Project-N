@@ -73,3 +73,5 @@ cross 0 entry, 4 windup, 7 pelvis leads, 9 extension, 11 contact anchor, 16 reco
 hook 0 entry, 4 windup, 7 raised arm, 10 contact, 14 follow-through, 18 withdrawal, 31 return.
 kick 0 entry, 6 lift, 12 chamber, 17–22 strike, 29 retract, 41 settle, 55 return. Actual contact tick comes from recorded World rather than these proposed ages.
 Review identical 60 fps previews in real time and half speed. Judge strong silhouette, perceived impact, lead/lag and readable contacts; not mechanical correctness alone. Potential mismatch: intermediate visual strike geometry differs from live physics; this remains a study. B's lower-body support is still procedural; C only differs in secondary visual motion. No gameplay promotion until owner compares. 
+
+0.10.3a test fix: pass explicit pelvis argument to visual leg sampler and assign exact recorded endpoint at contact. Re-run milestone validation; no game code changed.
