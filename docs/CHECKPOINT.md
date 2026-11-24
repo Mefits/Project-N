@@ -56,3 +56,6 @@ Trace showed cross fist 20–25 px above target chest; retarget down toward tors
 
 ## 0.10.1
 Aerial pose polish, attacker descent on confirmed slam, one floor impact, prone hold and rise, recovery. Same air sequence and 112-frame captures for A/B; preserve damage and collision geometry. CI requires verified landing timing and no extra hits.
+
+## 0.10.2 — Animation Lab
+Separate lab scene, real fixed-tick World recording with immutable snapshots, deterministic inputs for ten motions, scrub, single tick, playback rates, skin/skeleton, trajectories and anchor markers, contact/hitstop timeline, trace and 30 fps engine PNG export. Baseline diagnostic only: no candidate animation or Mocap yet. Test same-trace repeat, scenario contact counts, freeze, UI navigation, playback and export. Game sources unchanged.

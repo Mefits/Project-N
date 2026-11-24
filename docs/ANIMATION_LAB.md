@@ -15,3 +15,6 @@ Minimum working slice:
 0.10.5: single attacks, defense, hit reactions.
 0.10.6: ground/air chains, spacing, knockdown/get-up, interrupted transitions.
 Effects and sign system remain deferred until owner agrees motion quality is ready.
+
+## Implementation 0.10.2
+Open `res://lab/animation_lab.tscn` and F6 in Godot, or `godot --path . res://lab/animation_lab.tscn`. 120 Hz immutable snapshots; JSON vector arrays, actual inputs, contact and support state, real engine frames every four ticks (30 fps). Playback rates 1, .5, .25. The UI uses the same renderer and fixed view; traces are saved to user://animation_lab. Anchor drift and rendered ankle error reported separately (support markers are motor flags, not force measurements). Trace baseline identifies the motion commit; artifact REVISION identifies the lab commit. Candidate A/B overlay is deferred until first retarget candidate; this checkpoint records baseline only. No source motion imported.
