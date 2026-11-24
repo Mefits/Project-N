@@ -55,3 +55,8 @@ After F F F W+F lands, release F and use W during launcher recovery to pursue; P
 
 ## 0.10.1 — aerial choreography and knockdown
 Polish pass, same seven contact sequence and ground attack timing. Distinct air victim arms/legs and attacking leg silhouettes, no changes to pre-slam torso contact geometry. Successful air slam accelerates attacker down (540 px/s minimum); landing has 12 ticks recovery. Target rotates continuously toward a prone silhouette in flight; floor contact records actual impact speed, exactly one impact event, no extra HP damage. Downed state lasts 60 ticks, first 28 prone then 32 rising; rigid rotation of the IK skeleton preserves all bone lengths and applies floor clearance, not a ragdoll. No control or further hits during knockdown. Existing hurt timer can outlast rise briefly. No ground bounce, new effects or PixelFX yet. Test actual seven contacts, floor safety, downed lock, torso and limb lengths, descent and recovery in both directions. Next original PixelFX.
+
+## Current priority override — animation quality track
+Owner explicitly deferred PixelFX and hand-sign mechanics in favor of lifelike, sharp motion. Earlier next-step references to 0.11/0.12 are superseded, not deleted from history. Freeze the verified 0.10.1 gameplay baseline. Adopt one local N Animation Director skill; see AGENTS.md. Skill v1 is documentation/workflow, not completed lab or Mocap implementation.
+
+0.10.2 Animation Lab; 0.10.3 one retarget experiment; 0.10.4 locomotion; 0.10.5 attacks/reactions; 0.10.6 ground/air choreography. Subdivide when needed; one motion family per checkpoint. See docs/ANIMATION_LAB.md. Reassess effects and techniques only after visual review.
