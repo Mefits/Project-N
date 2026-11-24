@@ -15,8 +15,8 @@ const FIRST=[
 const SECOND=[
     [0,1.0,Vector2(3,-48),12.0,Vector2(25,7),Vector2(9,10),Vector2(18,-25),Vector2(-16,-10)],
     [5,1.0,Vector2(-3,-46),-14.0,Vector2(12,6),Vector2(-12,5),Vector2(9,-27),Vector2(-23,-6)],
-    [9,1.0,Vector2(7,-49),30.0,Vector2(7,10),Vector2(42,-1),Vector2(24,-15),Vector2(-19,-22)],
-    [13,1.0,Vector2(8,-49),33.0,Vector2(8,11),Vector2(44,0),Vector2(26,-12),Vector2(-18,-22)],
+    [9,1.0,Vector2(7,-49),30.0,Vector2(7,10),Vector2(42,-8),Vector2(24,-15),Vector2(-19,-22)],
+    [13,1.0,Vector2(8,-49),33.0,Vector2(8,11),Vector2(43,-9),Vector2(26,-12),Vector2(-18,-22)],
     [18,1.0,Vector2(2,-48),12.0,Vector2(11,8),Vector2(25,3),Vector2(18,-20),Vector2(-14,-18)],
     [27,0.0,Vector2(0,-50),0.0,Vector2(20,0),Vector2(7,10),Vector2(24,-2),Vector2(-24,-2)]
 ]

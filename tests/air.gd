@@ -42,6 +42,10 @@ func execute(w,mirror:bool=false,follow:bool=true,finish:bool=true,guard:bool=fa
         if a.age>=0 and a.kind!=last:
             kinds.append(a.kind)
             last=a.kind
+        if not mirror and a.kind in ["air_cross","air_slam"] and a.active() and not frozen:
+            var ar=w.rig_a
+            var dr=w.rig_b
+            print("N air active ",a.kind," ",a.age," roots ",src.pos," ",dst.pos," fist ",a.contact_point(ar,src.facing)," target ",dr.points.chest," ",dr.points.hips)
         if w.air_hits>old_air_hits:
             check(not src.grounded and not dst.grounded,"Air contact requires both airborne")
             old_air_hits=w.air_hits
