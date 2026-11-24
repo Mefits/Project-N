@@ -1,0 +1,45 @@
+name: N 0.10.3a GIF preview
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  anime-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot
+        run: |
+          curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          ln -s /tmp/godot/Godot_v4.4.1-stable_linux.x86_64 /tmp/godot/godot
+          echo /tmp/godot >> "$GITHUB_PATH"
+      - name: Capture actual comparison
+        run: |
+          set -euo pipefail
+          godot --headless --editor --import 2>&1 | tee /tmp/import.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log
+          timeout 30s godot --headless --script res://tests/anime.gd 2>&1 | tee /tmp/anime.log
+          ! grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/anime.log
+          timeout 120s xvfb-run -a godot --audio-driver Dummy --resolution 960x540 --script res://tests/anime_visual.gd 2>&1 | tee /tmp/visual.log
+          ! grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/visual.log
+          test "$(find reports/anime -name 'frame_*.png' | wc -l)" -eq 111
+      - name: Export GIF at normal and half speed
+        run: |
+          mkdir -p preview
+          for rate in 60 30; do
+            ffmpeg -v error -framerate "$rate" -i reports/anime/frame_%03d.png -vf 'palettegen=stats_mode=full' -y /tmp/palette.png
+            ffmpeg -v error -framerate "$rate" -i reports/anime/frame_%03d.png -i /tmp/palette.png -lavfi 'paletteuse=dither=bayer:bayer_scale=3' -loop 0 -y "preview/N_0.10.3a_ABС_${rate}fps.gif"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: N-0.10.3a-GIF
+          path: preview/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: N-0.10.3a-render-logs
+          path: /tmp/*.log
