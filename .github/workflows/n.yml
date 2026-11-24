@@ -59,6 +59,7 @@ jobs:
           for kind in kick_hit kick_miss kick_mirror; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 45; done
           for kind in block parry_counter; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 52; done
           for kind in chain chain_mirror; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 60; done
+          test "$(find reports/chain_four -name '*.png' | wc -l)" -eq 82
           rm -rf .godot
           find . -name '*.import' -delete
           printf '%s\n' "$GITHUB_SHA" > REVISION.txt
@@ -69,7 +70,7 @@ jobs:
           path: /tmp/n-*.log
       - uses: actions/upload-artifact@v4
         with:
-          name: N-0.09a-Godot
+          name: N-0.09b-Godot
           path: |
             project.godot
             game/

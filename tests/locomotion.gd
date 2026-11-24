@@ -77,21 +77,29 @@ func _run()->void:
         var origin:float=motion.a.pos.x
         var peak:float=0
         var lift:float=0
+        var flights:int=0
         for i in range(150):
             var prior:Array[Vector2]=motion.a.feet.duplicate()
             var old_swing:int=motion.a.swing
+            var old_release:int=motion.a.released_foot
             motion.tick({"move":-1 if mode=="back" else 1,"run":mode=="run" or mode=="back"},{})
             peak=maxf(peak,absf(motion.a.velocity.x))
+            if motion.a.run_flight:
+                flights+=1
+                check(motion.a.feet[0].y<M.FLOOR and motion.a.feet[1].y<M.FLOOR,"Both feet released in sprint")
             if motion.a.swing>=0:lift=maxf(lift,M.FLOOR-motion.a.feet[motion.a.swing].y)
             if motion.b.pos.x-motion.a.pos.x>40 and motion.a.pos.x>49:
                 for idx in range(2):
-                    if idx!=old_swing and idx!=motion.a.swing:
+                    if idx!=old_swing and idx!=motion.a.swing and idx!=old_release and idx!=motion.a.released_foot:
                         check(prior[idx].distance_to(motion.a.feet[idx])<.001,"Fixed support "+mode)
                     var side:String="near" if idx==0 else "far"
-                    if motion.a.swing!=idx:
+                    if motion.a.swing!=idx and motion.a.released_foot!=idx:
                         check(motion.rig_a.points["foot_"+side].distance_to(motion.a.feet[idx]-Vector2(0,2))<.5,"Support reach "+mode)
         check(peak>90 and motion.a.steps>3,"Motion "+mode)
-        if mode=="run":check(peak>230 and lift>22,"Running cadence and lift")
+        if mode=="run":
+            check(peak>230 and lift>22 and flights>10,"Running cadence, lift and flight")
+            print("N running flight ticks: ",flights)
+        else:check(flights==0,"No gait flight in walk/backpedal")
         if mode=="back":check(motion.a.pos.x<origin-80 and motion.a.facing==1 and peak<100,"Backpedal preserves guard")
     var runner=W.new()
     runner.a.separate(-120)

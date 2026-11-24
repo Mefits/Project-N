@@ -33,6 +33,7 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
     var step_u:float=m.swing_t/m.swing_duration if m.swing>=0 else 0.0
     var bounce:float=sin(step_u*PI)*lerpf(2.0,3.5,fast)*moving
     var hip_y:float=lerpf(float(g.hip.y),-51.0-bounce,moving)+9*m.land
+    hip_y-=m.flight_lift
     lean+=12*m.land
     if not m.grounded:
         var ap:Dictionary=MOTION.air(m,0)
@@ -59,7 +60,8 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
     for i in range(2):
         var side:String="near" if i==0 else "far"
         var side_sign:float=1 if i==0 else -1
-        var shoulder:Vector2=chest+Vector2(5*side_sign,2).rotated(deg_to_rad(lean))
+        var twist:float=float(action.get("twist",0))*weight
+        var shoulder:Vector2=chest+Vector2((5+3.5*twist)*side_sign,2-2.0*twist*side_sign).rotated(deg_to_rad(lean))
         var thigh:Vector2=hip+Vector2(2*side_sign,0)
         var foot:Vector2
         if m.grounded:

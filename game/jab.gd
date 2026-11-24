@@ -59,6 +59,8 @@ var kick_pending:int=0
 var queued_kind:String="jab"
 var hurt_total:int=HURT_TICKS
 var hurt_heavy:bool=false
+var hurt_style:String=""
+var finish_pending:int=0
 var age:int=-1
 var hurt:int=0
 var hp:int=100
@@ -88,37 +90,54 @@ func capture(pressed:bool,heavy:bool=false,kick:bool=false,guard:bool=false)->vo
     kick_latch=kick
 func duration()->int:
     if kind in ["cross","hook"]:return CHAIN.DURATION
+    if kind=="finisher":return 56
     if kind=="kick":return KICK.DURATION
     return HEAVY_DURATION if kind=="heavy" else DURATION
 func fist()->String:
-    if kind=="kick":return "foot_near"
+    if kind in ["kick","finisher"]:return "foot_near"
     return "hand_far" if kind in ["heavy","cross"] else "hand_near"
 func contact_point(rig,face:int)->Vector2:
     var p:Vector2=rig.points[fist()]
     # Kick reaches the visible forefoot, rather than the ankle joint alone.
-    if kind=="kick":p.x+=9*face
+    if kind in ["kick","finisher"]:p.x+=9*face
     return p
-func kicking()->bool:return kind=="kick" and age>=0
+func kicking()->bool:return kind in ["kick","finisher"] and age>=0
 func profile()->Dictionary:
-    if kind=="cross":return {"damage":9,"knockback":85.0,"hurt":32,"freeze":4,"strength":.85,"heavy":false}
-    if kind=="hook":return {"damage":16,"knockback":200.0,"hurt":42,"freeze":7,"strength":1.5,"heavy":true}
+    if kind=="cross":return {"damage":9,"knockback":85.0,"hurt":32,"freeze":4,"strength":.85,"heavy":false,"style":"cross"}
+    if kind=="hook":return {"damage":16,"knockback":70.0,"hurt":48,"freeze":7,"strength":1.3,"heavy":true,"style":"hook"}
+    if kind=="finisher":return {"damage":24,"knockback":260.0,"hurt":50,"freeze":9,"strength":2.1,"heavy":true,"style":"finisher"}
     if kind=="kick":return {"damage":KICK.DAMAGE,"knockback":KICK.KNOCKBACK,"hurt":KICK.HURT,"freeze":KICK.HITSTOP,"strength":1.6,"heavy":true}
     return {"damage":HEAVY_DAMAGE,"knockback":HEAVY_KNOCKBACK,"hurt":HEAVY_HURT,"freeze":HEAVY_HITSTOP,"strength":2.0,"heavy":true} if kind=="heavy" else {"damage":DAMAGE,"knockback":KNOCKBACK,"hurt":HURT_TICKS,"freeze":HITSTOP,"strength":1.0,"heavy":false}
 func tick(m)->void:
     reaction.step()
     if hurt>0:hurt-=1
     if chain_buffer>0:chain_buffer-=1
+    if finish_pending>0:finish_pending-=1
     if age>=0:
         age+=1
-        if age>=duration():
+        if age>=duration() and finish_pending>0:age=duration()-1
+        elif age>=duration():
             age=-1
             chain_count=0
             chain_buffer=0
             transition_pose={}
-    if queued and queued_kind=="jab" and kind in ["jab","cross"] and age>=0 and hurt==0:
+    if queued and queued_kind=="jab" and kind in ["jab","cross","hook"] and age>=0 and hurt==0:
         chain_buffer=BUFFER_TICKS
         queued=false
     var cancel:int=19 if kind=="jab" else CHAIN.CANCEL_FROM
+    if kind=="hook" and age>=cancel and chain_buffer>0 and contact_hit and hurt==0 and hp>0:
+        if finish_pending==0:finish_pending=40
+        chain_buffer=0
+    if finish_pending>0 and kind=="hook" and age>=0 and hurt==0 and m.grounded and m.swing<0 and absf(m.velocity.x)<=20:
+        transition_pose=_attack_pose()
+        kind="finisher"
+        age=0
+        connected=false
+        contact_hit=false
+        chain_count=4
+        peak_chain=maxi(peak_chain,chain_count)
+        attacks+=1
+        finish_pending=0
     if age>=cancel and chain_buffer>0 and contact_hit and kind in ["jab","cross"] and hurt==0 and hp>0:
         transition_pose=_attack_pose()
         kind="cross" if kind=="jab" else "hook"
@@ -167,6 +186,7 @@ func tick(m)->void:
     queued=false
 func locked()->bool:return age>=0 or hurt>0 or hp<=0 or blockstun>0
 func active()->bool:
+    if kind=="finisher":return age>=17 and age<=24 and not connected
     if kind in ["cross","hook"]:return age>=CHAIN.ACTIVE_FROM and age<=CHAIN.ACTIVE_TO and not connected
     if kind=="kick":return age>=KICK.ACTIVE_FROM and age<=KICK.ACTIVE_TO and not connected
     return age>=(HEAVY_ACTIVE_FROM if kind=="heavy" else ACTIVE_FROM) and age<=(HEAVY_ACTIVE_TO if kind=="heavy" else ACTIVE_TO) and not connected
@@ -184,12 +204,14 @@ func receive_parry()->void:
     blockstun=0
 func punish_parried(m,direction:int)->void:
     chain_buffer=0
+    finish_pending=0
     chain_count=0
     transition_pose={}
     age=-1
     hurt=PARRY_STUN
     hurt_total=hurt
     hurt_heavy=false
+    hurt_style=""
     queued=false
     kick_pending=0
     guarding=false
@@ -210,6 +232,7 @@ func receive(m,direction:int,attack:Dictionary,lever:float)->void:
     hurt=int(attack.hurt)
     hurt_total=hurt
     hurt_heavy=bool(attack.heavy)
+    hurt_style=str(attack.get("style",""))
     queued=false
     kick_pending=0
     m.velocity.x=float(attack.knockback)*direction
@@ -217,6 +240,9 @@ func receive(m,direction:int,attack:Dictionary,lever:float)->void:
 func pose(hybrid:bool=false)->Dictionary:
     if hurt>0:
         var u:float=float(hurt)/hurt_total
+        if hurt_style in ["cross","hook","finisher"]:
+            var lean:float=-13.0 if hurt_style=="cross" else (-22.0 if hurt_style=="hook" else -34.0)
+            return {"weight":u*(.6 if hybrid else 1.0),"hip":Vector2(-4,-48 if hurt_style=="cross" else -43),"lean":lean,"lead":Vector2(9,15) if hurt_style=="cross" else Vector2(-4,18),"rear":Vector2(2,7) if hurt_style=="cross" else Vector2(14,22),"twist":-.6 if hurt_style=="cross" else .7}
         if hybrid:
             # Small authored loss of balance; actual upper-body motion comes from springs.
             return {"weight":u*.55,"hip":Vector2(-2,-45 if hurt_heavy else -48),"lean":-5.0,"lead":Vector2(16,8),"rear":Vector2(6,12)}
@@ -229,11 +255,13 @@ func pose(hybrid:bool=false)->Dictionary:
     return _attack_pose()
 func _attack_pose()->Dictionary:
     if kind=="kick":return KICK.pose(age)
-    if kind in ["cross","hook"]:
-        var target:Dictionary=CHAIN.pose(kind,age)
+    if kind in ["cross","hook","finisher"]:
+        var target:Dictionary=KICK.pose(int(float(age)*64.0/56.0)) if kind=="finisher" else CHAIN.pose(kind,age)
         if not transition_pose.is_empty() and age<BLEND_TICKS:
             var blend:float=smoothstep(0.0,float(BLEND_TICKS),float(age))
-            return {"weight":lerpf(float(transition_pose.weight),float(target.weight),blend),"hip":Vector2(transition_pose.hip).lerp(target.hip,blend),"lean":lerpf(float(transition_pose.lean),float(target.lean),blend),"lead":Vector2(transition_pose.lead).lerp(target.lead,blend),"rear":Vector2(transition_pose.rear).lerp(target.rear,blend)}
+            var mixed:Dictionary={"weight":lerpf(float(transition_pose.weight),float(target.weight),blend),"hip":Vector2(transition_pose.hip).lerp(target.hip,blend),"lean":lerpf(float(transition_pose.lean),float(target.lean),blend),"lead":Vector2(transition_pose.lead).lerp(target.lead,blend),"rear":Vector2(transition_pose.rear).lerp(target.rear,blend),"twist":lerpf(float(transition_pose.get("twist",0)),float(target.get("twist",0)),blend)}
+            if target.has("kick_foot"):mixed["kick_foot"]=Vector2(24,-2).lerp(target.kick_foot,blend)
+            return mixed
         return target
     var pose_tick:float=float(age)*(80.0/HEAVY_DURATION if kind=="heavy" else 48.0/DURATION)
     var keys:Array=HEAVY_KEYS if kind=="heavy" else KEYS

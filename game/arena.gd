@@ -31,7 +31,7 @@ func _ready()->void:
     _button("Облик [F5]",_toggle_skin)
     _button("Стыки [F6]",_toggle_smooth)
     _button("Дистанция [T]",_close_reset)
-    toolbar.get_child(toolbar.get_child_count()-1).tooltip_text="Сброс на дистанцию 66 px. F ×3 — серия · H/J — удары."
+    toolbar.get_child(toolbar.get_child_count()-1).tooltip_text="Сброс на дистанцию 66 px. F ×4 — серия · H/J — удары."
     hud=Label.new()
     hud.position=Vector2(24,490)
     hud.add_theme_font_size_override("font_size",13)
@@ -106,7 +106,7 @@ func _physics_process(dt:float)->void:
     _hud()
     queue_redraw()
 func _hud()->void:
-    hud.text="A/D — движение · W — прыжок · Shift — бег · F/H/J — удары · S — блок   |   "+("Y — удар манекена · F2 — P2" if single_player else "P2: ←/→ ↑ ↓ · Ctrl · K/L/;")+"\nN  /  0.09a  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · серия "+str(world.jab_a.chain_count)+" · удары "+str(world.hits)+" · блоки "+str(world.blocks)+" · парирования "+str(world.parries)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
+    hud.text="A/D — движение · W — прыжок · Shift — бег · F/H/J — удары · S — блок   |   "+("Y — удар манекена · F2 — P2" if single_player else "P2: ←/→ ↑ ↓ · Ctrl · K/L/;")+"\nN  /  0.09b  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · серия "+str(world.jab_a.chain_count)+" · удары "+str(world.hits)+" · блоки "+str(world.blocks)+" · парирования "+str(world.parries)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
 func _segment(a:Vector2,b:Vector2,width:float,c:Color)->void:
     draw_line(a,b,Color("#17202b"),width+3,true)
     draw_line(a,b,c,width,true)

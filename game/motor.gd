@@ -22,6 +22,11 @@ var swing_to:=Vector2.ZERO
 var swing_t:float=0
 var swing_duration:float=STEP_TIME
 var swing_height:float=10
+var swing_fast:bool=false
+var flight_started:bool=false
+var released_foot:int=-1
+var run_flight:bool=false
+var flight_lift:float=0
 var run_mix:float=0
 var takeoff_feet:Array[Vector2]=[]
 var takeoff_gait:float=0
@@ -42,12 +47,18 @@ func _plant()->void:
     feet.assign([Vector2(pos.x+STANCE.HALF_WIDTH*facing,FLOOR),Vector2(pos.x-STANCE.HALF_WIDTH*facing,FLOOR)])
     swing=-1
     swing_t=0
+    flight_started=false
+    released_foot=-1
+    run_flight=false
+    flight_lift=0
 func _begin_step(index:int,axis:float)->void:
     swing=index
     swing_from=feet[index]
     # Freeze the step duration at lift-off; changing Shift mid-step cannot snap a foot.
     var moving:bool=absf(axis)>.01
     var fast:bool=moving and sprint and axis*facing>0
+    swing_fast=fast
+    flight_started=false
     swing_duration=.21 if fast else (.18 if moving else .15)
     swing_height=26.0 if fast else (10.0 if moving else 6.0)
     # Aim ahead of the future root, not the root at lift-off.
@@ -59,6 +70,9 @@ func _begin_step(index:int,axis:float)->void:
     next_foot=1-index
 func tick(input:Dictionary,opponent_x:float)->void:
     time+=DT
+    run_flight=false
+    released_foot=-1
+    flight_lift=0
     var axis:float=clampf(float(input.get("move",0)),-1,1)
     sprint=bool(input.get("run",false))
     var jump:bool=bool(input.get("jump",false))
@@ -77,7 +91,7 @@ func tick(input:Dictionary,opponent_x:float)->void:
     var backward:bool=axis*facing<0
     var target:float=axis*(96.0 if backward else (RUN if sprint else WALK))
     if input.get("combo_follow",false):target=axis*165.0
-    velocity.x=move_toward(velocity.x,target,DT*(550.0 if input.get("hurt",false) else (BRAKE if absf(axis)<.01 else (1900.0 if input.get("combo_follow",false) else ACCEL))))
+    velocity.x=move_toward(velocity.x,target,DT*(550.0 if input.get("hurt",false) else (2600.0 if input.get("combo_follow",false) else (BRAKE if absf(axis)<.01 else ACCEL))))
     if grounded and jump and not jump_latch:
         takeoff_feet.clear()
         for foot in feet:takeoff_feet.append(Vector2((foot.x-pos.x)*facing,foot.y-pos.y-2))
@@ -113,10 +127,22 @@ func tick(input:Dictionary,opponent_x:float)->void:
         feet[swing]=swing_from.lerp(swing_to,eased)
         # Early knee lift, late reach and settling, based on the running/walking silhouettes.
         feet[swing].y-=pow(sin(u*PI),1.25)*swing_height
+        # The rear foot leaves the ground shortly before the leading foot lands.
+        # This is a gait flight phase (not a jump state), with continuous world anchors.
+        if swing_fast and u>=.72 and (flight_started or (sprint and velocity.x*facing>170 and not input.get("settle_kick",false))):
+            flight_started=true
+            released_foot=1-swing
+            var f:float=smoothstep(.72,1.0,u)
+            feet[released_foot].y=FLOOR-9.0*f
+            run_flight=u<1.0
+            flight_lift=sin(clampf((u-.72)/.28,0,1)*PI)*5.0
         if u>=1:
             feet[swing]=swing_to
             swing=-1
             steps+=1
+            if released_foot>=0:
+                _begin_step(released_foot,velocity.x if sprint and absf(velocity.x)>10 and not input.get("settle_kick",false) else 0.0)
+                return
     if swing<0:
         if input.get("settle_kick",false):return
         if absf(velocity.x)>10:

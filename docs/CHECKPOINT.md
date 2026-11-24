@@ -40,3 +40,6 @@ Ground guard and timed parry, mirrored contacts, no guard cancel during attack, 
 
 ## 0.09a
 Retimed baseline attacks and sprint stride, first three-hit grounded string. Test run support, cadence, old contacts/defense at new timings, chain hit-confirm, buffered transition, mirrored string, interruption and whiff. Capture real chain frames. No air/combo finisher yet.
+
+## 0.09b
+Four-hit confirmed string and proportional approach, distinct hurt overlays, gait-only sprint flight. Validate actual contacts, mirrored finisher, support, minimum gap and cadence, capture real frames. Keep old regressions.

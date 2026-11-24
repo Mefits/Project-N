@@ -92,9 +92,15 @@ func _resolve(src,dst,attack,defender,contact:Dictionary,profile:Dictionary,resu
 
 func _motor_input(input:Dictionary,j,m,opponent)->Dictionary:
     # Bounded authored pursuit, only on confirmed linked hand attacks. No teleport or magnetic hit.
+    if j.finish_pending>0:return {"lock_facing":true,"settle_kick":true}
     if j.age>=0 and j.kind in ["cross","hook"]:
         var gap:float=(opponent.pos.x-m.pos.x)*m.facing
-        return {"lock_facing":true,"combo_follow":true,"move":float(m.facing) if gap>49 and gap<115 and absf(opponent.pos.y-m.pos.y)<45 else 0.0}
+        var goal:float=62.0 if j.kind=="cross" else 59.0
+        var approach:float=clampf((gap-goal)/16.0,0,1)
+        if gap>115 or absf(opponent.pos.y-m.pos.y)>45:approach=0
+        if j.connected and j.kind=="cross":approach*=.5
+        if j.connected and j.kind=="hook" and j.chain_buffer==0:approach=0
+        return {"lock_facing":true,"combo_follow":true,"move":float(m.facing)*approach}
     if j.guarding:return {"lock_facing":true,"hurt":j.blockstun>0}
     if j.kicking():return {"lock_facing":true,"kick_support":true}
     if j.kick_pending>0:return {"settle_kick":true,"lock_facing":true}

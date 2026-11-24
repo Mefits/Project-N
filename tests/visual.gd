@@ -80,7 +80,7 @@ func defense_sequence(scene,name:String,parry:bool)->void:
     if parry:
         if scene.world.parries!=1 or scene.world.hits!=1:push_error("Parry capture mismatch");quit(1)
     elif scene.world.blocks!=1 or scene.world.hits!=0:push_error("Block capture mismatch");quit(1)
-func chain_sequence(scene,name:String,mirror:bool=false)->void:
+func chain_sequence(scene,name:String,mirror:bool=false,finish:bool=false)->void:
     scene.world=W.new()
     scene.world.a.separate(150)
     scene.world.b.separate(scene.world.a.pos.x+60-scene.world.b.pos.x)
@@ -89,18 +89,18 @@ func chain_sequence(scene,name:String,mirror:bool=false)->void:
     scene.debug=false
     DirAccess.make_dir_recursive_absolute("res://reports/"+name)
     var sent:int=0
-    for frame in range(60):
+    for frame in range(82 if finish else 60):
         for i in range(4):
             var n:int=frame*4+i
             var attacker=scene.world.jab_b if mirror else scene.world.jab_a
-            var press:bool=n==12 or (sent==1 and attacker.kind=="jab" and attacker.age>=11) or (sent==2 and attacker.kind=="cross" and attacker.age>=11)
+            var press:bool=n==12 or (sent==1 and attacker.kind=="jab" and attacker.age>=11) or (sent==2 and attacker.kind=="cross" and attacker.age>=11) or (finish and sent==3 and attacker.kind=="hook" and attacker.age>=11)
             if press:sent+=1
             var input:Dictionary={"jab":press}
             scene.world.tick({} if mirror else input,input if mirror else {})
         scene._hud()
         scene.queue_redraw()
         await capture(name+"/frame_%03d"%frame)
-    if scene.world.hits!=3:push_error("Chain capture mismatch "+name);quit(1)
+    if scene.world.hits!=(4 if finish else 3):push_error("Chain capture mismatch "+name);quit(1)
 func check_skin(scene,state:Dictionary,tick0:int)->void:
     if scene.world.ticks!=tick0 or scene.world.rig_a.points!=state:
         push_error("Skin altered simulation")
@@ -163,6 +163,7 @@ func _run()->void:
     await defense_sequence(scene,"parry_counter",true)
     await chain_sequence(scene,"chain")
     await chain_sequence(scene,"chain_mirror",true)
+    await chain_sequence(scene,"chain_four",false,true)
     var state:Dictionary=scene.world.rig_a.points.duplicate(true)
     var tick0:int=scene.world.ticks
     scene._toggle_skin()
