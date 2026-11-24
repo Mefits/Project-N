@@ -55,7 +55,7 @@ func _attacker(i:int)->Dictionary:
         p["shoulder_"+s]=_world(shoulder,f)
         p["elbow_"+s]=_world(shoulder+Vector2(key[5+j*2]),f)
         p["hand_"+s]=_world(shoulder+Vector2(key[6+j*2]),f)
-    _legs(p,f,key[9] if f.kind=="finisher" else null)
+    _legs(p,f,hip,key[9] if f.kind=="finisher" else null)
     # Blend from the actual previous displayed pose (not neutral) over 3 ticks.
     if f.age<3 and i>0:
         var prior:Dictionary=authored[-1].a
