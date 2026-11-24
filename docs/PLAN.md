@@ -63,3 +63,6 @@ Owner explicitly deferred PixelFX and hand-sign mechanics in favor of lifelike, 
 
 ## 0.10.3 retarget experiment
 One source, CMU 09_01 run, actual BVH forward kinematics; no asset extraction from commercial titles. Baseline remains unchanged. Preview scene with four variants, native-time and phase-normalized comparisons. Normalized directions preserve N bone lengths; authored stylization increases forward lean and limb amplitude and shortens the cycle. Proposed 550 ms cycle is not measured from reference. In-place floor fit is only for inspection; motor support alignment, loop seam, transitions and depth remain unresolved. Next checkpoint 0.10.4 should choose one motion family (running) and integrate a support-aware candidate only if visual evidence warrants it. PixelFX and signs still deferred.
+
+## 0.10.3a
+Owner wants anime energy rather than physical realism. Compare identical four-hit baseline with independently authored visual keys B and selective secondary motion C. Freeze gameplay; choose direction after visual review. Mocap remains useful for locomotion but is not the next automatic milestone.

@@ -62,3 +62,14 @@ Separate lab scene, real fixed-tick World recording with immutable snapshots, de
 
 ## 0.10.3 — isolated real-motion retarget experiment
 CMU 09_01 run BVH read from the credited Hahne conversion, hierarchical FK with ordered rotations, source indices 1–90. Derived sagittal projection, root travel removed, normalized by source leg length. Compare baseline 52-tick steady cycle, source 89 intervals, N length-corrected transfer and an authored 66-tick style hypothesis. Source projection is not direct game animation; candidate floor fitting is not planted-foot IK and a cycle seam is not solved. Test exact segment lengths, finite points and clearance, immutable baseline, actual graphical comparison. No gameplay files changed. See lab/mocap/SOURCE.md. Do not promote candidate into game until visual review and support/root-motion adaptation.
+
+## 0.10.3a — authored animation A/B/C direction study
+# Anime direction A/B/C study
+Baseline 0.10.3 actual four-hit World trace, identical input, root, contact ticks, hitstop and camera. No effects. Reference: supplied martial arts row sheet (jab/punch/front kick/stagger, source FPS unknown), only silhouettes examined; no source pixels copied. The anime exaggeration is an authored hypothesis, not extracted from Storm footage.
+A = unchanged game render. B = independently keyed pelvis, chest, head, shoulders, elbows and hands, deliberate stepped pose cadence, different preparation/delivery paths, authored victim recoil. Feet use the baseline support and visual knee IK, kick uses keyed ankle. At real contact the striking endpoint and victim pose match baseline; a short visual blend approaches the contact. C = same B plus small head/non-striking-arm lag and selective recorded victim spring angles. No new collision, physics, or playable moves. All poses still use same old skin; no 3D depth system. No claim of true smear art; transient visual length variation is allowed.
+Pose beats (attack-local ticks at 120 Hz, proposed):
+jab 0 entry, 3 compression, 6 pelvis leads, 8 extension, 9 contact anchor, 13 follow, 18 recover.
+cross 0 entry, 4 windup, 7 pelvis leads, 9 extension, 11 contact anchor, 16 recovery.
+hook 0 entry, 4 windup, 7 raised arm, 10 contact, 14 follow-through, 18 withdrawal, 31 return.
+kick 0 entry, 6 lift, 12 chamber, 17–22 strike, 29 retract, 41 settle, 55 return. Actual contact tick comes from recorded World rather than these proposed ages.
+Review identical 60 fps previews in real time and half speed. Judge strong silhouette, perceived impact, lead/lag and readable contacts; not mechanical correctness alone. Potential mismatch: intermediate visual strike geometry differs from live physics; this remains a study. B's lower-body support is still procedural; C only differs in secondary visual motion. No gameplay promotion until owner compares. 
