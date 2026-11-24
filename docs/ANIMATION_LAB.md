@@ -18,3 +18,6 @@ Effects and sign system remain deferred until owner agrees motion quality is rea
 
 ## Implementation 0.10.2
 Open `res://lab/animation_lab.tscn` and F6 in Godot, or `godot --path . res://lab/animation_lab.tscn`. 120 Hz immutable snapshots; JSON vector arrays, actual inputs, contact and support state, real engine frames every four ticks (30 fps). Playback rates 1, .5, .25. The UI uses the same renderer and fixed view; traces are saved to user://animation_lab. Anchor drift and rendered ankle error reported separately (support markers are motor flags, not force measurements). Trace baseline identifies the motion commit; artifact REVISION identifies the lab commit. Candidate A/B overlay is deferred until first retarget candidate; this checkpoint records baseline only. No source motion imported.
+
+## 0.10.3
+Open `lab/mocap/preview.tscn` (F6). Four panels: current N, actual projected CMU capture, length-normalized N transfer, authored faster/stylized transfer. Default phase mode displays each at the same fractional cycle, not native speed; switch to native for timing. Original lab remains unchanged. Source and reproducible offline importer in lab/mocap; no network runtime dependency. This is an in-place motion study, not a motor-integrated candidate.

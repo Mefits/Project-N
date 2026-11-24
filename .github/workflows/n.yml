@@ -72,6 +72,11 @@ jobs:
           if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-lab-visual.log; then exit 1; fi
           test "$(find reports/lab/run -name '*.png' | wc -l)" -eq 55
           test "$(find reports/lab/jab -name '*.png' | wc -l)" -eq 37
+          timeout 30s godot --headless --script res://tests/mocap.gd 2>&1 | tee /tmp/n-mocap.log
+          if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-mocap.log; then exit 1; fi
+          timeout 120s xvfb-run -a godot --audio-driver Dummy --resolution 960x540 --script res://tests/mocap_visual.gd 2>&1 | tee /tmp/n-mocap-visual.log
+          if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-mocap-visual.log; then exit 1; fi
+          for mode in phase native; do test "$(find reports/mocap/$mode -name '*.png' | wc -l)" -eq 67; done
           rm -rf .godot
           find . -name '*.import' -delete
           printf '%s\n' "$GITHUB_SHA" > REVISION.txt
@@ -82,7 +87,7 @@ jobs:
           path: /tmp/n-*.log
       - uses: actions/upload-artifact@v4
         with:
-          name: N-0.10.2-Godot
+          name: N-0.10.3-Godot
           include-hidden-files: true
           path: |
             project.godot

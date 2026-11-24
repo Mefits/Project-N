@@ -59,3 +59,6 @@ Aerial pose polish, attacker descent on confirmed slam, one floor impact, prone 
 
 ## 0.10.2 — Animation Lab
 Separate lab scene, real fixed-tick World recording with immutable snapshots, deterministic inputs for ten motions, scrub, single tick, playback rates, skin/skeleton, trajectories and anchor markers, contact/hitstop timeline, trace and 30 fps engine PNG export. Baseline diagnostic only: no candidate animation or Mocap yet. Test same-trace repeat, scenario contact counts, freeze, UI navigation, playback and export. Game sources unchanged.
+
+## 0.10.3 — isolated real-motion retarget experiment
+CMU 09_01 run BVH read from the credited Hahne conversion, hierarchical FK with ordered rotations, source indices 1–90. Derived sagittal projection, root travel removed, normalized by source leg length. Compare baseline 52-tick steady cycle, source 89 intervals, N length-corrected transfer and an authored 66-tick style hypothesis. Source projection is not direct game animation; candidate floor fitting is not planted-foot IK and a cycle seam is not solved. Test exact segment lengths, finite points and clearance, immutable baseline, actual graphical comparison. No gameplay files changed. See lab/mocap/SOURCE.md. Do not promote candidate into game until visual review and support/root-motion adaptation.

@@ -25,3 +25,5 @@ A/D — движение; W — прыжок; Shift — бег; F/H/J — быс
 Текущий приоритет — качество анимаций. [N Animation Director](.agents/skills/n-animation-director/SKILL.md) · [Спецификация Animation Lab](docs/ANIMATION_LAB.md). Эффекты и печати отложены. Скилл — рабочая инструкция для агента, не новая игровая механика. Лаборатория и Mocap ещё не реализованы.
 
 **Animation Lab 0.10.2:** открой `lab/animation_lab.tscn` и F6, либо `godot --path . res://lab/animation_lab.tscn`. Выбери движение, Space — пуск/пауза, ←/→ — один тик, Home — начало. JSON и PNG 30fps сохраняются в `user://animation_lab`. Игровая сцена F5 не изменена.
+
+**Mocap 0.10.3:** открой `lab/mocap/preview.tscn` и F6. Сравнение старого бега, записи CMU 09_01, переноса на пропорции N и стилизации. Переключатель фазы/темпа, покадровая навигация и скелет. Эксперимент не меняет игровое движение. [Источник и условия](lab/mocap/SOURCE.md).
