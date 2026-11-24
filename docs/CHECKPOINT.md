@@ -51,3 +51,5 @@ Alternate rising strike, true ballistic launch and return to ground. Verify mirr
 Optional pursuit, linked aerial lead/rear/downward strikes. Verify 7 actual contacts, two directions, no finisher without input, no pursuit on block/whiff, hitstop, bounded trajectories, landing/recovery and prior regressions. Engine frame captures. No effects yet.
 
 0.10 tuning: first CI confirmed the first air hit but second missed; narrower cross and slam approach goals, vertical offset and upward wrist path. Keep actual contact radius unchanged.
+
+Trace showed cross fist 20–25 px above target chest; retarget down toward torso, reduce vertical follow offset. No hit radius change.

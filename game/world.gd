@@ -111,7 +111,7 @@ func _motor_input(input:Dictionary,j,m,opponent)->Dictionary:
         var gap:float=(opponent.pos.x-m.pos.x)*m.facing
         var goal:float=48.0 if j.kind=="air_cross" else (43.0 if j.kind=="air_slam" else 58.0)
         var vx:float=clampf((gap-goal)*12.0+opponent.velocity.x*m.facing,0,300)*m.facing
-        var offset:float=-32.0 if j.kind=="air_slam" else (-12.0 if j.kind=="air_cross" else 0.0)
+        var offset:float=-32.0 if j.kind=="air_slam" else (-4.0 if j.kind=="air_cross" else 0.0)
         var vy:float=clampf(opponent.velocity.y+(opponent.pos.y+offset-m.pos.y)*14.0,-510,300)
         return {"lock_facing":true,"air_follow":true,"air_vx":vx,"air_vy":vy}
     if m.pursuing:
