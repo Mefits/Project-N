@@ -10,6 +10,8 @@ const REF_RIG=preload("res://game/rig.gd")
 var ref_record=REF_REC.new()
 var ref_frames:Array[Dictionary]=[]
 var ref_contact:int=-1
+var lunge_hit:Dictionary={}
+var lunge_miss:Dictionary={}
 const OLD_SKIN=preload("res://game/fighter_skin.gd")
 const EXTRA_HOLD=[0,2,4,6] # additional 120 Hz ticks; only in replay C
 var tick:float=0
@@ -20,6 +22,7 @@ var slider:HSlider
 var info:Label
 func _ready()->void:
     _build_reference()
+    _build_lunge()
     var bar:=HBoxContainer.new()
     bar.position=Vector2(12,8)
     add_child(bar)
@@ -50,8 +53,8 @@ func _button(bar:HBoxContainer,txt:String,cb:Callable)->void:
 func seek(t:float)->void:
     tick=clampf(t,0,220)
     slider.set_value_no_signal(tick)
-    var f:Dictionary=ref_record.frames[mini(int(tick),ref_record.frames.size()-1)]
-    info.text="N 0.10.3e  ·  %03d / 220  ·  %.0f мс  ·  %s  ·  %d/1  ·  %.1f×"%[int(tick),tick*1000/120,f.a.kind,f.hits,speed]
+    var f:Dictionary=lunge_hit.frames[int(tick)]
+    info.text="N 0.10.3f  ·  %03d / 220  ·  %.0f мс  ·  B: %d/1  ·  %s  ·  %.1f×"%[int(tick),tick*1000/120,f.hits,"HITSTOP" if f.frozen else "",speed]
     queue_redraw()
 func _process(dt:float)->void:
     if playing:seek(fposmod(tick+120*dt*speed,221))
@@ -63,7 +66,7 @@ func _skeleton(p:Dictionary,c:Color)->void:
     for k in p:draw_circle(p[k],2.5,c)
 func _draw()->void:
     draw_rect(Rect2(0,0,960,540),Color("#172632"))
-    var names:Array=["A  ·  Игровой джеб","B  ·  Позы Какаши / перенос","C  ·  Позы + опора и контакт"]
+    var names:Array=["A  ·  0.10.3e B / старый контакт","B  ·  Выпад / новый контакт","C  ·  Тот же выпад / промах"]
     for variant in range(3):
         var y:float=66+157*variant
         var floor_y:float=y+143
@@ -72,7 +75,7 @@ func _draw()->void:
         draw_line(Vector2(12,floor_y),Vector2(948,floor_y),Color("#82968e"),1)
         var source_tick:int=mini(int(tick),ref_frames.size()-1)
         var sample_frame:Dictionary=ref_record.frames[source_tick]
-        var p:Dictionary=ref_frames[source_tick][variant]
+        var p:Dictionary=ref_frames[source_tick][1] if variant==0 else (lunge_hit.frames[int(tick)] if variant==1 else lunge_miss.frames[int(tick)])
         draw_set_transform(Vector2(10,floor_y-430),0,Vector2.ONE)
         if bones:
             _skeleton(p.a,Color("#6daac8"))
@@ -408,3 +411,162 @@ func _build_reference()->void:
         ref_frames.append({0:{"a":f.points,"b":frame.b.points},1:{"a":raw,"b":frame.b.points},2:{"a":fitted,"b":frame.b.points}})
     if max_support>.001 or max_error>.001 or changed<10:push_error("Reference retarget constraint failure")
     print("N 0.10.3e reference: contact ",ref_contact," age ",ca," changed ",changed," support error ",max_support," contact error ",max_error)
+
+# N 0.10.3f: independent deterministic lab attack. The original 0.10.3e B
+# silhouettes are preserved as the main authority; no correction to old jab.
+# Source frame times are unknown; 120 Hz timeline below is authored.
+# 0-8 prepare, 8-13 coil, 13-23 acceleration / step, 23-29 follow through,
+# 29-55 recover with two authored foot steps. Root travels 34 px and stays.
+# Active window 18-24. Same swept torso radius (17 px) as World.
+# Hitstop 10 ticks only on actual collision; no target snapping or auto-hit.
+# This is a separate lab simulation, not a playable attack in World.
+const LUNGE_TRAVEL=34.0
+const LUNGE_FREEZE=10
+const LUNGE_START=12
+
+func _lunge_key(k:int,root_pos:Vector2,face:int)->Dictionary:
+    return _reference_key(k,{"pos":root_pos,"face":face})
+
+func _lunge_move(p:Dictionary,dx:Vector2)->Dictionary:
+    var out:Dictionary={}
+    for key in p:out[key]=Vector2(p[key])+dx
+    return out
+
+func _lunge_guard(origin:Vector2,face:int)->Dictionary:
+    # Use the actual idle victim pose, mirrored if necessary.
+    var source:Dictionary=ref_record.frames[0].b
+    var out:Dictionary={}
+    for key in source.points:
+        var v:Vector2=Vector2(source.points[key])-Vector2(source.pos)
+        out[key]=origin+Vector2(v.x*float(face)/float(source.face),v.y)
+    return out
+
+func _lunge_curve(age:int,start:Vector2,face:int)->Dictionary:
+    var t:float=float(age)
+    var drive:float=pow(clampf((t-13.0)/10.0,0.0,1.0),2.0)
+    var shift:Vector2=Vector2(LUNGE_TRAVEL*drive*float(face),0)
+    var k0:Dictionary=_lunge_key(0,start,face)
+    var k1:Dictionary=_lunge_key(1,start,face)
+    var k2:Dictionary=_lunge_key(2,start,face)
+    var p:Dictionary
+    if t<8.0:p=_mix_reference(k0,k1,smoothstep(0.0,8.0,t)*.65)
+    elif t<13.0:p=_mix_reference(k0,k1,lerpf(.65,1.0,smoothstep(8.0,13.0,t)))
+    elif t<=23.0:p=_mix_reference(k1,k2,drive)
+    elif t<=29.0:p=k2.duplicate(true)
+    else:p=_mix_reference(k2,k0,smoothstep(29.0,50.0,t))
+    p=_lunge_move(p,shift)
+    # Explicit stepping tracks. Feet hold on the floor before release and after
+    # landing; knees follow the correction partly, preserving traced silhouette.
+    for j in range(2):
+        var side:String="near" if j==0 else "far"
+        var key:String="foot_"+side
+        var knee:String="knee_"+side
+        var initial:Vector2=k0[key]
+        var final:Vector2=Vector2(k2[key])+Vector2(LUNGE_TRAVEL*face,0)
+        var rest:Vector2=Vector2(k0[key])+Vector2(LUNGE_TRAVEL*face,0)
+        initial.y=start.y-2.0
+        final.y=start.y-2.0
+        rest.y=start.y-2.0
+        var begin:float=13.0 if j==0 else 16.0
+        var end:float=23.0 if j==0 else 25.0
+        var recovery_begin:float=40.0 if j==0 else 30.0
+        var recovery_end:float=53.0 if j==0 else 40.0
+        var target:Vector2=initial
+        if t>=begin:
+            var u:float=clampf((t-begin)/(end-begin),0.0,1.0)
+            target=initial.lerp(final,smoothstep(0.0,1.0,u))
+            target.y-=sin(PI*u)*(9.0 if j==0 else 5.0)
+        if t>=recovery_begin:
+            var u:float=clampf((t-recovery_begin)/(recovery_end-recovery_begin),0.0,1.0)
+            target=final.lerp(rest,smoothstep(0.0,1.0,u))
+            target.y-=sin(PI*u)*6.0
+        p[knee]=Vector2(p[knee])+(target-Vector2(p[key]))*.55
+        p[key]=target
+    return {"pose":p,"root":start+shift}
+
+func _lunge_victim(base:Dictionary,elapsed:int,face:int)->Dictionary:
+    if elapsed<=0:return base.duplicate(true)
+    var t:float=float(elapsed)
+    var slide:float=44.0*(1.0-pow(1.0-clampf(t/36.0,0.0,1.0),3.0))
+    var recoil:float=smoothstep(0.0,5.0,t)*(1.0-smoothstep(11.0,32.0,t))
+    var out:Dictionary=_lunge_move(base,Vector2(float(face)*slide,0))
+    var pivot:Vector2=out.hips
+    # Rotate the upper body away from incoming strike; leave feet on ground.
+    for key in ["chest","head","shoulder_near","shoulder_far","elbow_near","elbow_far","hand_near","hand_far"]:
+        out[key]=pivot+(Vector2(out[key])-pivot).rotated(deg_to_rad(38.0*recoil*float(face)))
+    return out
+
+func _lunge_sweep(previous:Vector2,current:Vector2,target:Dictionary)->float:
+    var distance:float=INF
+    for u in [0.0,.25,.5,.75,1.0]:
+        var center:Vector2=Vector2(target.chest).lerp(target.hips,u)
+        distance=minf(distance,center.distance_to(Geometry2D.get_closest_point_to_segment(center,previous,current)))
+    return distance
+
+func _simulate_lunge(gap:float,face:int)->Dictionary:
+    var start:=Vector2(400.0 if face==1 else 560.0,430.0)
+    var target_origin:Vector2=start+Vector2(gap*face,0)
+    var target:Dictionary=_lunge_guard(target_origin,-face)
+    var frames:Array[Dictionary]=[]
+    var age:int=0
+    var freeze:int=0
+    var hit_tick:int=-1
+    var hit_age:int=-1
+    var after:int=0
+    var previous:Vector2=_lunge_curve(0,start,face).pose.hand_near
+    var hit_distance:float=-1.0
+    var hold_count:int=0
+    var max_step:float=0.0
+    var previous_root:Vector2=start
+    for i in range(221):
+        var frozen:bool=freeze>0
+        if frozen:
+            var copy:Dictionary=frames[-1].duplicate(true)
+            copy.frozen=true
+            frames.append(copy)
+            freeze-=1
+            hold_count+=1
+            continue
+        var sample:Dictionary=_lunge_curve(age,start,face)
+        var p:Dictionary=sample.pose
+        var root_pos:Vector2=sample.root
+        var b:Dictionary=_lunge_victim(target,after,face)
+        if i>=LUNGE_START and age>=18 and age<=24 and hit_tick<0:
+            var dist:float=_lunge_sweep(previous,p.hand_near,b)
+            if dist<=17.0 and (target_origin.x-root_pos.x)*face>=38.0:
+                hit_tick=i
+                hit_age=age
+                hit_distance=dist
+                freeze=LUNGE_FREEZE
+        frames.append({"a":p,"b":b,"root":root_pos,"hits":int(hit_tick>=0),"frozen":false,"age":age})
+        if hit_tick>=0 and i>hit_tick:after+=1
+        elif hit_tick==i:after=1
+        max_step=maxf(max_step,root_pos.distance_to(previous_root))
+        previous_root=root_pos
+        previous=p.hand_near
+        if i>=LUNGE_START:age=mini(age+1,55)
+    return {"frames":frames,"hit":hit_tick,"age":hit_age,"distance":hit_distance,"hold":hold_count,"max_step":max_step}
+
+func _build_lunge()->void:
+    lunge_hit=_simulate_lunge(170.0,1)
+    lunge_miss=_simulate_lunge(230.0,1)
+    var mirror:Dictionary=_simulate_lunge(170.0,-1)
+    var mirror_miss:Dictionary=_simulate_lunge(230.0,-1)
+    if lunge_hit.hit<0 or lunge_miss.hit>=0 or mirror_miss.hit>=0 or mirror.age!=lunge_hit.age:
+        push_error("Lunge hit/miss/mirror regression")
+    if lunge_hit.hold!=LUNGE_FREEZE or lunge_miss.hold!=0 or mirror.hold!=LUNGE_FREEZE:
+        push_error("Lunge hitstop regression")
+    for trial in [lunge_hit,lunge_miss,mirror,mirror_miss]:
+        if trial.max_step>7.0:push_error("Lunge root discontinuity")
+        for frame in trial.frames:
+            for fighter in ["a","b"]:
+                for key in frame[fighter]:
+                    if not Vector2(frame[fighter][key]).is_finite():push_error("Lunge nonfinite joint")
+            for side in ["near","far"]:
+                if Vector2(frame.a["foot_"+side]).y>430.001:push_error("Lunge floor violation")
+        if trial.hit>=0:
+            var hit_frame:Dictionary=trial.frames[trial.hit]
+            for i in range(1,LUNGE_FREEZE+1):
+                var frozen_frame:Dictionary=trial.frames[trial.hit+i]
+                if frozen_frame.a!=hit_frame.a or frozen_frame.b!=hit_frame.b:push_error("Lunge frozen pose changed")
+    print("N 0.10.3f lunge: hit tick ",lunge_hit.hit," age ",lunge_hit.age," distance ",lunge_hit.distance," whiff ",lunge_miss.hit," mirrored ",mirror.age," hold ",lunge_hit.hold," root max step ",lunge_hit.max_step)
