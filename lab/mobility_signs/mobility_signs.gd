@@ -343,7 +343,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
 	_label(Vector2(16, 24), "N / mobility + hand signs   |   60 Hz sandbox", 20, BLUE)
-	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout]", 14)
+	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout], 14)
 	_label(Vector2(16, 69), "Arrows: optional independent aim   L / ESC cancel   F2 coast/latch   F3 target   F4 layout   R reset", 14)
 	_label(Vector2(dims.x - 230, 24), "Mode: " + ("LATCH" if latch_mode else "COAST"), 15, GOLD)
 	var bottom := dims.y - 86.0
@@ -351,7 +351,7 @@ func _draw() -> void:
 	_label(Vector2(16, bottom + 21), "BOLT: W D S     ORB: S W D W     RUSH: A D W", 16, GOLD)
 	_label(Vector2(16, bottom + 44), "Air dashes: %d/2    Double jump: %s    Casts: %d    Hits: %d" % [air_dashes, "ready" if air_jump else "used", casts, hits], 14)
 	var status := ("Signs: " + sequence) if signing else "Move freely"
-	if layout in [2, 3] and not signing and prepared_spell.is_empty():
+	if layout == 1 and not signing and prepared_spell.is_empty():
 		status = "Quick double SPACE: dash / later SPACE: double jump"
 	if not prepared_spell.is_empty():
 		status += "   |   " + prepared_spell + " %.1fs" % ready_left
