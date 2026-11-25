@@ -42,8 +42,8 @@ var jump_requested := false
 var dash_requested := false
 var cast_requested := false
 var dash_direction := Vector2.RIGHT
-# F4 cycles both requested seal modifiers and both dash options, plus original.
-const LAYOUTS := ["SHIFT / RMB", "RMB / SHIFT", "SHIFT / 2xSPACE", "RMB / 2xSPACE", "TAB / SHIFT"]
+# Keyboard-only experiment: F4 toggles optional double-space dash.
+const LAYOUTS := ["K dash", "K / double SPACE dash"]
 const DOUBLE_TAP := 0.26
 var layout := 0
 var last_space := -10.0
@@ -65,14 +65,21 @@ func _seal_modifier(down: bool) -> void:
 		sequence = ""
 
 func _seal_key() -> int:
-	if layout in [0, 2]:
-		return KEY_SHIFT
-	if layout == 4:
-		return KEY_TAB
-	return 0
+	return KEY_SHIFT
+
+func _aim_from_keys(move: Vector2, arrows: Vector2) -> void:
+	if arrows.length_squared() > 0.0:
+		aim = arrows.normalized()
+	elif not signing and move.length_squared() > 0.0:
+		aim = move.normalized()
+
+func _update_aim() -> void:
+	var move := Vector2(_axis(), float(int(Input.is_physical_key_pressed(KEY_S)) - int(Input.is_physical_key_pressed(KEY_W))))
+	var arrows := Vector2(float(int(Input.is_physical_key_pressed(KEY_RIGHT)) - int(Input.is_physical_key_pressed(KEY_LEFT))), float(int(Input.is_physical_key_pressed(KEY_DOWN)) - int(Input.is_physical_key_pressed(KEY_UP))))
+	_aim_from_keys(move, arrows)
 
 func _space_press() -> void:
-	if layout in [2, 3] and clock - last_space <= DOUBLE_TAP:
+	if layout == 1 and clock - last_space <= DOUBLE_TAP:
 		dash_requested = true
 		last_space = -10.0
 	else:
@@ -100,7 +107,7 @@ func _input(event: InputEvent) -> void:
 					prepared_spell = RECIPES[sequence]
 					ready_left = READY_TIME
 					sign_done = true
-					_notice(prepared_spell + " ready - click to release")
+					_notice(prepared_spell + " ready - J to release")
 				else:
 					var prefix := false
 					for recipe in RECIPES:
@@ -112,9 +119,9 @@ func _input(event: InputEvent) -> void:
 			return
 		match k:
 			KEY_SPACE: _space_press()
-			KEY_SHIFT:
-				if layout in [1, 4]:
-					dash_requested = true
+			KEY_K: dash_requested = true
+			KEY_J: cast_requested = true
+			KEY_L: _cancel()
 			KEY_F2:
 				latch_mode = not latch_mode
 				_notice("Latched movement" if latch_mode else "Coast on inertia")
@@ -129,16 +136,6 @@ func _input(event: InputEvent) -> void:
 				_reset()
 			KEY_ESCAPE:
 				_cancel()
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_RIGHT:
-			if layout in [1, 3]:
-				_seal_modifier(event.pressed)
-			elif event.pressed and layout == 0:
-				dash_requested = true
-			elif event.pressed and layout in [2, 4]:
-				_cancel()
-		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			cast_requested = true
 
 func _notice(s: String) -> void:
 	message = s
@@ -155,6 +152,7 @@ func _cancel() -> void:
 func _reset() -> void:
 	pos = Vector2(800, FLOOR)
 	vel = Vector2.ZERO
+	aim = Vector2.RIGHT
 	dash_left = 0.0
 	dash_cooldown = 0.0
 	grounded = true
@@ -200,10 +198,7 @@ func _step(dt: float) -> void:
 		if ready_left <= 0.0:
 			prepared_spell = ""
 			_notice("Technique expired")
-	var cursor_world := (get_viewport().get_mouse_position() - _screen_origin()) / zoom
-	var direction := cursor_world - _center()
-	if direction.length_squared() > 1.0:
-		aim = direction.normalized()
+	_update_aim()
 	if jump_requested:
 		if dash_left <= 0.0 and (grounded or air_jump):
 			if not grounded:
@@ -348,8 +343,8 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
 	_label(Vector2(16, 24), "N / mobility + hand signs   |   60 Hz sandbox", 20, BLUE)
-	_label(Vector2(16, 47), "A/D move   SPACE jump   |   signs / dash: " + LAYOUTS[layout] + "   |   F4 switch", 14)
-	_label(Vector2(16, 69), "LMB release   ESC cancel   F2 coast/latch   F3 target   R reset", 14)
+	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout]", 14)
+	_label(Vector2(16, 69), "Arrows: optional independent aim   L / ESC cancel   F2 coast/latch   F3 target   F4 layout   R reset", 14)
 	_label(Vector2(dims.x - 230, 24), "Mode: " + ("LATCH" if latch_mode else "COAST"), 15, GOLD)
 	var bottom := dims.y - 86.0
 	draw_rect(Rect2(0, bottom, dims.x, 86), Color("#111a27"))
