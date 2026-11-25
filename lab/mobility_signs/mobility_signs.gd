@@ -40,7 +40,7 @@ var sign_done := false
 var sequence := ""
 var prepared_spell := ""
 var ready_left := 0.0
-var moving_target := true
+var moving_target := false
 var hp := MAX_HP
 var enemy_hp := MAX_HP
 var enemy_vel := Vector2.ZERO
@@ -284,6 +284,29 @@ func _move_horizontal(x: float, dt: float) -> void:
 	# Same ordinary M3 motor for acceleration and braking, with or without seals.
 	vel.x = move_toward(vel.x, x * RUN, (MOTOR_GROUND if grounded else MOTOR_AIR) * dt)
 
+func _movement_locked() -> bool:
+	return melee_left > 0.00001 or hurt > 0.0
+
+func _stop_for_melee() -> void:
+	# Stop the previous movement/dash, without freezing gravity or the world.
+	dash_left = 0.0
+	vel = Vector2.ZERO
+
+func _advance_player_motion(move_x: float, dt: float) -> void:
+	if dash_left > 0.0:
+		dash_left = maxf(0.0, dash_left - dt)
+		vel = dash_direction * DASH_SPEED
+		if dash_left <= 0.0:
+			vel *= 0.42
+	else:
+		# Hitstun keeps only the reaction impulse, never the held movement command.
+		_move_horizontal(0.0 if _movement_locked() else move_x, dt)
+		if not grounded:
+			vel.y += GRAVITY * dt
+		elif vel.y > 0:
+			vel.y = 0
+	pos += vel * dt
+
 func _try_jump(x: float) -> bool:
 	if not grounded and not air_jump:
 		return false
@@ -346,29 +369,18 @@ func _step(dt: float) -> void:
 		attack_requested = not melee_queue.is_empty()
 		_melee(strike_dir)
 	if jump_requested:
-		if hurt <= 0.0 and not guarding:
+		if not _movement_locked() and not guarding:
 			_try_jump(move_x)
 		jump_requested = false
 	if dash_requested:
-		if hurt <= 0.0 and not guarding:
+		if not _movement_locked() and not guarding:
 			_start_dash(aim)
 		dash_requested = false
 	if cast_requested:
 		if hurt <= 0.0 and not guarding:
 			_cast()
 		cast_requested = false
-	if dash_left > 0.0:
-		dash_left = maxf(0.0, dash_left - dt)
-		vel = dash_direction * DASH_SPEED
-		if dash_left <= 0.0:
-			vel *= 0.42
-	else:
-		_move_horizontal(move_x, dt)
-		if not grounded:
-			vel.y += GRAVITY * dt
-		elif vel.y > 0:
-			vel.y = 0
-	pos += vel * dt
+	_advance_player_motion(move_x, dt)
 	pos.x = clampf(pos.x, 24.0, WORLD_W - 24.0)
 	if pos.y < 62.0:
 		pos.y = 62.0
@@ -417,6 +429,7 @@ func _enemy_blocks(source: Vector2) -> bool:
 	return enemy_guarding and enemy_hurt <= 0.00001 and (source.x - target.x) * enemy_facing >= -3.0
 
 func _melee(direction: Vector2 = Vector2.ZERO) -> void:
+	_stop_for_melee()
 	var next_hit := combo_stage + 1
 	melee_facing = facing
 	# Link contact still requires physical range; the finisher's launch vector
@@ -500,7 +513,7 @@ func _update_enemy(dt: float) -> void:
 			if delta.length() <= MELEE_RANGE and enemy_cooldown <= 0.0:
 				enemy_attack_left = 0.30
 				enemy_cooldown = 0.95
-				enemy_vel.x = 0.0
+				enemy_vel = Vector2.ZERO
 			else:
 				var desired := enemy_facing * 345.0 if absf(delta.x) > 42.0 else 0.0
 				enemy_vel.x = move_toward(enemy_vel.x, desired, 1700.0 * dt)
@@ -658,7 +671,7 @@ func _draw() -> void:
 		draw_rect(Rect2(bar, Vector2(84.0 * ready_left / READY_TIME, 5)), GOLD)
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
-	_label(Vector2(16, 24), "N / M6 three-hit combo", 20, BLUE)
+	_label(Vector2(16, 24), "N / M6.1 three-hit combo", 20, BLUE)
 	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout], 14)
 	_label(Vector2(16, 69), "H H H combo   S guard   ESC cancel   F1 hitboxes   F3 AI   F4 layout   R reset", 14)
 	_label(Vector2(dims.x - 255, 24), ("BOX ON" if show_hitboxes else "BOX OFF") + " / " + ("AI ON" if moving_target else "AI OFF"), 15, GOLD)

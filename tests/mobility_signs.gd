@@ -23,6 +23,7 @@ func _run() -> void:
 		return
 	root.add_child(lab)
 	lab.set_physics_process(false)
+	check(not lab.moving_target, "AI starts disabled")
 	lab.moving_target = false
 	check(lab.layout == 0, "keyboard default coast")
 	lab._aim_from_keys(Vector2(1, -1), Vector2.ZERO)
@@ -263,5 +264,53 @@ func _run() -> void:
 	lab._queue_melee(Vector2.RIGHT)
 	lab._hit_player(8, Vector2.ZERO, lab.target)
 	check(lab.combo_stage == 0 and lab.melee_queue.is_empty(), "player hit interrupts melee chain only")
+	lab._reset()
+	lab.moving_target = false
+	lab.target = lab._center() + Vector2(50,0)
+	lab.vel = Vector2(420,0)
+	lab.dash_left = 0.1
+	var start_x: float = lab.pos.x
+	lab._melee()
+	check(lab.vel == Vector2.ZERO and lab.dash_left == 0.0, "melee cancels run and dash momentum")
+	for i in range(6):
+		lab._advance_player_motion(1.0, 1.0 / 60.0)
+	check(is_equal_approx(lab.pos.x, start_x), "held forward cannot move during attack")
+	lab._advance_player_motion(-1.0, 1.0 / 60.0)
+	check(is_equal_approx(lab.pos.x, start_x), "held back cannot move during attack")
+	lab._queue_melee(Vector2.RIGHT)
+	lab.jump_requested = true
+	lab.dash_requested = true
+	lab._step(1.0 / 60.0)
+	check(lab.grounded and lab.dash_left == 0.0, "jump and dash do not override strike recovery")
+	lab._reset()
+	lab.grounded = false
+	lab.pos.y = 400.0
+	lab.target = lab._center() + Vector2(50,0)
+	lab.enemy_grounded = false
+	lab.vel = Vector2(-420,-350)
+	lab._melee()
+	check(lab.vel == Vector2.ZERO, "air attack stops old flight impulse")
+	lab._advance_player_motion(1.0, 1.0 / 60.0)
+	check(is_zero_approx(lab.vel.x) and lab.vel.y > 0.0, "air attack retains gravity")
+	lab._reset()
+	lab.vel = Vector2(420,0)
+	lab.dash_left = 0.1
+	lab._hit_player(8, Vector2(-330,-120), lab.target)
+	check(lab.vel == Vector2(-330,-120) and lab.dash_left == 0.0, "damage replaces previous velocity with knockback")
+	lab._advance_player_motion(1.0, 1.0 / 60.0)
+	check(lab.vel.x < 0.0, "held movement cannot override knockback during stun")
+	lab.hurt = 0.0
+	lab.melee_left = 0.0
+	lab.vel = Vector2.ZERO
+	lab._advance_player_motion(1.0, 1.0 / 60.0)
+	check(lab.vel.x > 0.0, "normal control resumes after recovery")
+	lab._reset()
+	lab.moving_target = false
+	var dummy_start: Vector2 = lab.target
+	for i in range(60):
+		lab._step(1.0 / 60.0)
+	check(lab.target == dummy_start and lab.hp == 100, "disabled AI stands still")
+	key(lab, KEY_F3)
+	check(lab.moving_target, "F3 enables AI")
 	print("Mobility signs smoke: ", failures, " failures")
 	quit(0 if failures == 0 else 1)
