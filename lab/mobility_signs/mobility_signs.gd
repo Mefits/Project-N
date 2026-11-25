@@ -26,7 +26,7 @@ var grounded := true
 var signing := false
 var sign_done := false
 var sequence := ""
-var ready := ""
+var prepared_spell := ""
 var ready_left := 0.0
 var latched := 0.0
 var latch_mode := false
@@ -69,14 +69,14 @@ func _input(event: InputEvent) -> void:
 			if not sign_done:
 				var letter: String = {KEY_W:"W", KEY_A:"A", KEY_S:"S", KEY_D:"D"}[k]
 				if sequence.is_empty():
-					ready = ""
+					prepared_spell = ""
 					ready_left = 0.0
 				sequence += letter
 				if RECIPES.has(sequence):
-					ready = RECIPES[sequence]
+					prepared_spell = RECIPES[sequence]
 					ready_left = READY_TIME
 					sign_done = true
-					_notice(ready + " ready - click to release")
+					_notice(prepared_spell + " ready - click to release")
 				else:
 					var prefix := false
 					for recipe in RECIPES:
@@ -112,7 +112,7 @@ func _cancel() -> void:
 	signing = false
 	sign_done = false
 	sequence = ""
-	ready = ""
+	prepared_spell = ""
 	ready_left = 0.0
 	_notice("Preparation canceled")
 
@@ -157,10 +157,10 @@ func _step(dt: float) -> void:
 	clock += dt
 	message_left = maxf(0.0, message_left - dt)
 	dash_cooldown = maxf(0.0, dash_cooldown - dt)
-	if not ready.is_empty():
+	if not prepared_spell.is_empty():
 		ready_left = maxf(0.0, ready_left - dt)
 		if ready_left <= 0.0:
-			ready = ""
+			prepared_spell = ""
 			_notice("Technique expired")
 	var cursor_world := (get_viewport().get_mouse_position() - _screen_origin()) / zoom
 	var direction := cursor_world - _center()
@@ -253,10 +253,10 @@ func _start_dash(d: Vector2, free: bool = false) -> bool:
 	return true
 
 func _cast() -> void:
-	if ready.is_empty():
+	if prepared_spell.is_empty():
 		return
-	var spell := ready
-	ready = ""
+	var spell := prepared_spell
+	prepared_spell = ""
 	ready_left = 0.0
 	casts += 1
 	if spell == "Rush":
@@ -302,9 +302,9 @@ func _draw() -> void:
 			var q := above + Vector2((float(i) - float(sequence.length() - 1) * 0.5) * 25.0, 0)
 			draw_rect(Rect2(q - Vector2(11, 19), Vector2(22, 23)), Color("#36465b"))
 			_label(q + Vector2(-6, -2), sequence[i], 18, GOLD)
-	if not ready.is_empty():
+	if not prepared_spell.is_empty():
 		var bar := above + Vector2(-42, -35 if signing else 0)
-		_label(bar + Vector2(0, -5), ready, 18, GOLD)
+		_label(bar + Vector2(0, -5), prepared_spell, 18, GOLD)
 		draw_rect(Rect2(bar, Vector2(84, 5)), Color("#3e4f60"))
 		draw_rect(Rect2(bar, Vector2(84.0 * ready_left / READY_TIME, 5)), GOLD)
 	draw_set_transform(Vector2.ZERO)
@@ -318,6 +318,6 @@ func _draw() -> void:
 	_label(Vector2(16, bottom + 21), "BOLT: W D S     ORB: S W D W     RUSH: A D W", 16, GOLD)
 	_label(Vector2(16, bottom + 44), "Air dashes: %d/2    Double jump: %s    Casts: %d    Hits: %d" % [air_dashes, "ready" if air_jump else "used", casts, hits], 14)
 	var status := ("Signs: " + sequence) if signing else "Move freely"
-	if not ready.is_empty():
-		status += "   |   " + ready + " %.1fs" % ready_left
+	if not prepared_spell.is_empty():
+		status += "   |   " + prepared_spell + " %.1fs" % ready_left
 	_label(Vector2(16, bottom + 67), status + ("   |   " + message if message_left > 0 else ""), 14, BLUE)
