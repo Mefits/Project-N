@@ -174,5 +174,37 @@ func _run() -> void:
 	for i in range(25):
 		lab._step(1.0 / 60.0)
 	check(lab.hp == 92, "AI telegraphed melee hits")
+	lab._reset()
+	lab.moving_target = false
+	check(lab._guard_intent(true) and not lab._guard_intent(false), "S alone guards")
+	key(lab, KEY_SHIFT)
+	key(lab, KEY_S)
+	check(lab.sequence == "" and not lab._guard_intent(true), "Shift+S is seal input not guard")
+	key(lab, KEY_SHIFT, false)
+	key(lab, KEY_K)
+	check(not lab._guard_intent(true), "S+K prioritizes dash")
+	lab.dash_requested = false
+	key(lab, KEY_J)
+	check(not lab._guard_intent(true), "S+J prioritizes cast")
+	lab.cast_requested = false
+	check(lab._guard_intent(true), "guard resumes after action")
+	lab.dash_left = 0.1
+	check(not lab._guard_intent(true), "no guard during dash")
+	lab._reset()
+	lab.facing = -1.0
+	check(lab._start_dash(Vector2.DOWN) and lab.dash_direction == Vector2.LEFT, "ground down dash follows facing")
+	lab._reset()
+	lab.target = lab._center() + Vector2(50,0)
+	lab._melee()
+	check(lab.debug_strikes.size() == 1 and lab.debug_strikes[0]["origin"] == lab._center(), "debug snapshot matches melee origin")
+	check(lab._melee_contains(Vector2.ZERO, 1.0, 76.0, Vector2(76,0)), "front edge included")
+	check(not lab._melee_contains(Vector2.ZERO, 1.0, 76.0, Vector2(-11,0)), "rear margin excluded")
+	check(not lab._melee_contains(Vector2.ZERO, 1.0, 76.0, Vector2(77,0)), "range boundary excluded")
+	check(lab._spike_hit_area({"x":100.0}) == Rect2(82,664,226,144), "spike overlay matches effective area")
+	check(lab.show_hitboxes, "hitbox display default on")
+	key(lab, KEY_F1)
+	check(not lab.show_hitboxes, "F1 hides hitboxes")
+	key(lab, KEY_F1)
+	check(lab.show_hitboxes, "F1 shows hitboxes")
 	print("Mobility signs smoke: ", failures, " failures")
 	quit(0 if failures == 0 else 1)

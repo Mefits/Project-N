@@ -51,6 +51,12 @@ var guarding := false
 var melee_facing := 1.0
 var spikes: Array[Dictionary] = []
 var blocks := 0
+var show_hitboxes := true
+var debug_strikes: Array[Dictionary] = []
+const STRIKE_BACK_MARGIN := 10.0
+const DEBUG_FLASH := 0.13
+const ATTACK_COLOR := Color("#ff7979")
+const WINDUP_COLOR := Color("#f2d278")
 var shots: Array[Dictionary] = []
 var hits := 0
 var casts := 0
@@ -100,8 +106,8 @@ func _aim_from_keys(move: Vector2, arrows: Vector2) -> void:
 	elif not signing and move.length_squared() > 0.0:
 		aim = move.normalized()
 
-func _update_aim() -> void:
-	var move := Vector2(_axis(), float(int(Input.is_physical_key_pressed(KEY_S)) - int(Input.is_physical_key_pressed(KEY_W))))
+func _update_aim(down_as_aim: bool = true) -> void:
+	var move := Vector2(_axis(), float(int(down_as_aim and Input.is_physical_key_pressed(KEY_S)) - int(Input.is_physical_key_pressed(KEY_W))))
 	var arrows := Vector2(float(int(Input.is_physical_key_pressed(KEY_RIGHT)) - int(Input.is_physical_key_pressed(KEY_LEFT))), float(int(Input.is_physical_key_pressed(KEY_DOWN)) - int(Input.is_physical_key_pressed(KEY_UP))))
 	_aim_from_keys(move, arrows)
 
@@ -155,6 +161,8 @@ func _input(event: InputEvent) -> void:
 				moving_target = not moving_target
 				enemy_vel = Vector2.ZERO
 				enemy_attack_left = 0.0
+			KEY_F1:
+				show_hitboxes = not show_hitboxes
 			KEY_F4:
 				layout = (layout + 1) % LAYOUTS.size()
 				_seal_modifier(false)
@@ -188,6 +196,7 @@ func _reset() -> void:
 	air_jump = true
 	shots.clear()
 	spikes.clear()
+	debug_strikes.clear()
 	hp = MAX_HP
 	enemy_hp = MAX_HP
 	target = Vector2(1250, FLOOR - 30)
@@ -251,11 +260,30 @@ func _try_jump(x: float) -> bool:
 	vel = Vector2(x * RUN, JUMP)
 	return true
 
+func _guard_intent(s_down: bool) -> bool:
+	# S is guard except when it belongs to a seal or a directional action.
+	return s_down and not signing and not dash_requested and not cast_requested and hurt <= 0.0 and melee_left <= 0.0 and dash_left <= 0.0
+
+func _melee_contains(origin: Vector2, direction: float, radius: float, point: Vector2) -> bool:
+	var delta := point - origin
+	return delta.length_squared() <= radius * radius and delta.x * direction >= -STRIKE_BACK_MARGIN
+
+func _spike_hit_area(s: Dictionary) -> Rect2:
+	return Rect2(float(s["x"]), FLOOR - SPIKE_HEIGHT, SPIKE_WIDTH, SPIKE_HEIGHT).grow(18.0)
+
+func _remember_strike(origin: Vector2, direction: float, radius: float) -> void:
+	# Snapshot the actual instantaneous hit check, not a moving recovery hitbox.
+	debug_strikes.append({"origin":origin, "direction":direction, "radius":radius, "life":DEBUG_FLASH})
+
 func _step(dt: float) -> void:
 	if hp <= 0 or enemy_hp <= 0:
 		queue_redraw()
 		return
 	clock += dt
+	for i in range(debug_strikes.size() - 1, -1, -1):
+		debug_strikes[i]["life"] -= dt
+		if debug_strikes[i]["life"] <= 0.0:
+			debug_strikes.remove_at(i)
 	hurt = maxf(0.0, hurt - dt)
 	enemy_hurt = maxf(0.0, enemy_hurt - dt)
 	melee_left = maxf(0.0, melee_left - dt)
@@ -266,10 +294,12 @@ func _step(dt: float) -> void:
 		if ready_left <= 0.0:
 			prepared_spell = ""
 			_notice("Technique expired")
-	_update_aim()
+	var s_down := Input.is_physical_key_pressed(KEY_S)
+	# Holding S alone cannot redirect aim down; S+J/K can.
+	_update_aim(not s_down or (not signing and (dash_requested or cast_requested)))
 	if absf(aim.x) > 0.05:
 		facing = signf(aim.x)
-	guarding = Input.is_physical_key_pressed(KEY_I) and hurt <= 0.0 and melee_left <= 0.0 and dash_left <= 0.0
+	guarding = _guard_intent(s_down)
 	var move_x := 0.0 if signing or guarding or hurt > 0.0 else _axis()
 	if attack_requested:
 		if not guarding and hurt <= 0.0 and melee_left <= 0.0:
@@ -340,8 +370,8 @@ func _step(dt: float) -> void:
 func _melee() -> void:
 	melee_left = 0.32
 	melee_facing = facing
-	var delta := target - _center()
-	if delta.length() <= MELEE_RANGE and delta.x * melee_facing >= -10.0:
+	_remember_strike(_center(), melee_facing, MELEE_RANGE)
+	if _melee_contains(_center(), melee_facing, MELEE_RANGE, target):
 		_hit_enemy(9, Vector2(melee_facing * 300.0, -155.0))
 	else:
 		_notice("Melee miss")
@@ -383,7 +413,8 @@ func _update_enemy(dt: float) -> void:
 		var old := enemy_attack_left
 		enemy_attack_left = maxf(0.0, old - dt)
 		if old > 0.12 and enemy_attack_left <= 0.12:
-			if delta.length() <= MELEE_RANGE + 8.0 and delta.x * enemy_facing >= -10.0:
+			_remember_strike(target, enemy_facing, MELEE_RANGE + 8.0)
+			if _melee_contains(target, enemy_facing, MELEE_RANGE + 8.0, _center()):
 				_hit_player(8, Vector2(enemy_facing * 330.0, -120.0), target)
 	if enemy_hurt <= 0.0:
 		if moving_target and enemy_attack_left <= 0.0:
@@ -424,8 +455,7 @@ func _update_spikes(dt: float) -> void:
 			spikes.remove_at(i)
 			continue
 		if age >= 0.22 and age < 0.48 and not s["hit"]:
-			var area := Rect2(float(s["x"]), FLOOR - SPIKE_HEIGHT, SPIKE_WIDTH, SPIKE_HEIGHT)
-			if area.grow(18.0).has_point(target):
+			if _spike_hit_area(s).has_point(target):
 				s["hit"] = true
 				_hit_enemy(20, Vector2(float(s["dir"]) * 170.0, -420.0))
 		spikes[i] = s
@@ -437,7 +467,7 @@ func _start_dash(d: Vector2) -> bool:
 		air_dashes -= 1
 	# Ground dashes cannot point into the ground.
 	if grounded and d.y > 0.0:
-		d = Vector2(signf(d.x) if absf(d.x) > 0.05 else 1.0, 0)
+		d = Vector2(signf(d.x) if absf(d.x) > 0.05 else facing, 0)
 	dash_direction = d.normalized()
 	dash_left = 0.18
 	dash_cooldown = 0.32
@@ -472,6 +502,18 @@ func _fighter(p: Vector2, color: Color, facing: float) -> void:
 	draw_line(p - Vector2(0, 16), p + Vector2(-10, 0), color, 5.0, true)
 	draw_line(p - Vector2(0, 16), p + Vector2(10, 0), color, 5.0, true)
 
+func _draw_strike_zone(origin: Vector2, direction: float, radius: float, color: Color, solid: bool) -> void:
+	# Circle clipped by the same rear margin as _melee_contains.
+	var angle := acos(-STRIKE_BACK_MARGIN / radius)
+	var polygon := PackedVector2Array()
+	for i in range(49):
+		var a := lerpf(-angle, angle, float(i) / 48.0)
+		polygon.append(origin + Vector2(cos(a) * direction, sin(a)) * radius)
+	if solid:
+		draw_colored_polygon(polygon, Color(color, 0.18))
+	polygon.append(polygon[0])
+	draw_polyline(polygon, color, 1.8, true)
+
 func _draw() -> void:
 	var dims := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, dims), Color("#101a28"))
@@ -503,9 +545,27 @@ func _draw() -> void:
 			for i in range(5):
 				var sx := x + 38.0 * i
 				draw_colored_polygon(PackedVector2Array([Vector2(sx, FLOOR), Vector2(sx + 20.0, FLOOR - h * (0.8 + 0.2 * (i % 2))), Vector2(sx + 38.0, FLOOR)]), Color("#b4a087"))
-	draw_circle(target, 20, Color(RED, 0.15))
 	for s in shots:
 		draw_circle(s["p"], s["r"], s["c"])
+	if show_hitboxes:
+		# The projectile test uses swept projectile radius against the target's 20px circle.
+		draw_arc(target, 20.0, 0.0, TAU, 40, Color("#9cddae"), 1.5, true)
+		draw_circle(target, 2.5, Color("#9cddae"))
+		draw_circle(_center(), 2.5, Color("#9cddae"))
+		for s in shots:
+			draw_arc(s["p"], s["r"], 0.0, TAU, 40, ATTACK_COLOR, 2.0, true)
+		for s in spikes:
+			var age: float = s["age"]
+			var area := _spike_hit_area(s)
+			if age < 0.22:
+				draw_rect(area, WINDUP_COLOR, false, 1.8)
+			elif age < 0.48 and not s["hit"]:
+				draw_rect(area, Color(ATTACK_COLOR, 0.16))
+				draw_rect(area, ATTACK_COLOR, false, 1.8)
+		if enemy_attack_left > 0.12:
+			_draw_strike_zone(target, enemy_facing, MELEE_RANGE + 8.0, WINDUP_COLOR, false)
+		for z in debug_strikes:
+			_draw_strike_zone(z["origin"], z["direction"], z["radius"], ATTACK_COLOR, true)
 	var above := pos - Vector2(0, 88)
 	if signing and not sequence.is_empty():
 		for i in range(sequence.length()):
@@ -519,10 +579,10 @@ func _draw() -> void:
 		draw_rect(Rect2(bar, Vector2(84.0 * ready_left / READY_TIME, 5)), GOLD)
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
-	_label(Vector2(16, 24), "N / M5 combat + seals", 20, BLUE)
+	_label(Vector2(16, 24), "N / M5.1 combat + seals", 20, BLUE)
 	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout], 14)
-	_label(Vector2(16, 69), "H melee   I guard   ESC cancel   F3 AI on/off   F4 layout   R reset", 14)
-	_label(Vector2(dims.x - 230, 24), "COAST / " + ("AI ON" if moving_target else "AI OFF"), 15, GOLD)
+	_label(Vector2(16, 69), "H melee   S guard   ESC cancel   F1 hitboxes   F3 AI   F4 layout   R reset", 14)
+	_label(Vector2(dims.x - 255, 24), ("BOX ON" if show_hitboxes else "BOX OFF") + " / " + ("AI ON" if moving_target else "AI OFF"), 15, GOLD)
 	var hp_width := 140.0
 	_label(Vector2(16, 86), "P1 %d" % hp, 12, BLUE)
 	draw_rect(Rect2(80, 76, hp_width, 9), Color("#34485c"))
