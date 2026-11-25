@@ -34,7 +34,7 @@ var moving_target := true
 var shots: Array[Dictionary] = []
 var hits := 0
 var casts := 0
-var message := "Try W D S while holding TAB"
+var message := "Try W D S while holding SHIFT"
 var message_left := 4.0
 var camera := Vector2(1030, 590)
 var zoom := 0.8
@@ -42,6 +42,11 @@ var jump_requested := false
 var dash_requested := false
 var cast_requested := false
 var dash_direction := Vector2.RIGHT
+# F4 cycles both requested seal modifiers and both dash options, plus original.
+const LAYOUTS := ["SHIFT / RMB", "RMB / SHIFT", "SHIFT / 2xSPACE", "RMB / 2xSPACE", "TAB / SHIFT"]
+const DOUBLE_TAP := 0.26
+var layout := 0
+var last_space := -10.0
 
 func _ready() -> void:
 	queue_redraw()
@@ -49,18 +54,37 @@ func _ready() -> void:
 func _axis() -> float:
 	return float(int(Input.is_physical_key_pressed(KEY_D)) - int(Input.is_physical_key_pressed(KEY_A)))
 
+func _seal_modifier(down: bool) -> void:
+	if down and not signing:
+		latched = _axis()
+		signing = true
+		sign_done = false
+		sequence = ""
+	elif not down:
+		signing = false
+		sequence = ""
+
+func _seal_key() -> int:
+	if layout in [0, 2]:
+		return KEY_SHIFT
+	if layout == 4:
+		return KEY_TAB
+	return 0
+
+func _space_press() -> void:
+	if layout in [2, 3] and clock - last_space <= DOUBLE_TAP:
+		dash_requested = true
+		last_space = -10.0
+	else:
+		jump_requested = true
+		last_space = clock
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k: int = event.physical_keycode
-		if k == KEY_TAB:
-			if event.pressed and not event.echo and not signing:
-				latched = _axis()
-				signing = true
-				sign_done = false
-				sequence = ""
-			elif not event.pressed:
-				signing = false
-				sequence = ""
+		if k == _seal_key() and k != 0:
+			if not event.echo:
+				_seal_modifier(event.pressed)
 			get_viewport().set_input_as_handled()
 			return
 		if not event.pressed or event.echo:
@@ -87,22 +111,34 @@ func _input(event: InputEvent) -> void:
 						sequence = ""
 			return
 		match k:
-			KEY_SPACE: jump_requested = true
-			KEY_SHIFT: dash_requested = true
+			KEY_SPACE: _space_press()
+			KEY_SHIFT:
+				if layout in [1, 4]:
+					dash_requested = true
 			KEY_F2:
 				latch_mode = not latch_mode
 				_notice("Latched movement" if latch_mode else "Coast on inertia")
 			KEY_F3:
 				moving_target = not moving_target
+			KEY_F4:
+				layout = (layout + 1) % LAYOUTS.size()
+				_seal_modifier(false)
+				last_space = -10.0
+				_notice("Controls: " + LAYOUTS[layout])
 			KEY_R:
 				_reset()
 			KEY_ESCAPE:
 				_cancel()
-	if event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			if layout in [1, 3]:
+				_seal_modifier(event.pressed)
+			elif event.pressed and layout == 0:
+				dash_requested = true
+			elif event.pressed and layout in [2, 4]:
+				_cancel()
+		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			cast_requested = true
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_cancel()
 
 func _notice(s: String) -> void:
 	message = s
@@ -128,6 +164,7 @@ func _reset() -> void:
 	hits = 0
 	casts = 0
 	clock = 0.0
+	last_space = -10.0
 	jump_requested = false
 	dash_requested = false
 	cast_requested = false
@@ -135,6 +172,7 @@ func _reset() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		last_space = -10.0
 		signing = false
 		sequence = ""
 		jump_requested = false
@@ -310,14 +348,16 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
 	_label(Vector2(16, 24), "N / mobility + hand signs   |   60 Hz sandbox", 20, BLUE)
-	_label(Vector2(16, 47), "A/D move   SPACE jump / double jump   SHIFT dash to cursor   hold TAB + WASD signs", 14)
-	_label(Vector2(16, 69), "LMB release   RMB cancel   F2 coast / latch   F3 target   R reset", 14)
+	_label(Vector2(16, 47), "A/D move   SPACE jump   |   signs / dash: " + LAYOUTS[layout] + "   |   F4 switch", 14)
+	_label(Vector2(16, 69), "LMB release   ESC cancel   F2 coast/latch   F3 target   R reset", 14)
 	_label(Vector2(dims.x - 230, 24), "Mode: " + ("LATCH" if latch_mode else "COAST"), 15, GOLD)
 	var bottom := dims.y - 86.0
 	draw_rect(Rect2(0, bottom, dims.x, 86), Color("#111a27"))
 	_label(Vector2(16, bottom + 21), "BOLT: W D S     ORB: S W D W     RUSH: A D W", 16, GOLD)
 	_label(Vector2(16, bottom + 44), "Air dashes: %d/2    Double jump: %s    Casts: %d    Hits: %d" % [air_dashes, "ready" if air_jump else "used", casts, hits], 14)
 	var status := ("Signs: " + sequence) if signing else "Move freely"
+	if layout in [2, 3] and not signing and prepared_spell.is_empty():
+		status = "Quick double SPACE: dash / later SPACE: double jump"
 	if not prepared_spell.is_empty():
 		status += "   |   " + prepared_spell + " %.1fs" % ready_left
 	_label(Vector2(16, bottom + 67), status + ("   |   " + message if message_left > 0 else ""), 14, BLUE)

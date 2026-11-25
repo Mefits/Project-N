@@ -15,6 +15,12 @@ func key(lab, code: int, down: bool = true) -> void:
 	e.pressed = down
 	lab._input(e)
 
+func mouse(lab, down: bool = true) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_RIGHT
+	e.pressed = down
+	lab._input(e)
+
 func _run() -> void:
 	var lab = load("res://lab/mobility_signs/mobility_signs.tscn").instantiate()
 	if not lab.has_method("_step"):
@@ -23,6 +29,50 @@ func _run() -> void:
 		return
 	root.add_child(lab)
 	lab.set_physics_process(false)
+	check(lab.layout == 0 and not lab.latch_mode, "new default: Shift seals, RMB dash, coast")
+	key(lab, KEY_SHIFT)
+	key(lab, KEY_W)
+	key(lab, KEY_D)
+	key(lab, KEY_S)
+	check(lab.prepared_spell == "Bolt" and not lab.dash_requested, "Shift seals")
+	key(lab, KEY_SHIFT, false)
+	mouse(lab)
+	check(lab.dash_requested and not lab.signing, "RMB dash")
+	lab._reset()
+	key(lab, KEY_F4)
+	check(lab.layout == 1, "F4 cycle")
+	mouse(lab)
+	key(lab, KEY_A)
+	key(lab, KEY_D)
+	key(lab, KEY_W)
+	check(lab.prepared_spell == "Rush" and lab.signing, "RMB seals")
+	mouse(lab, false)
+	key(lab, KEY_SHIFT)
+	check(not lab.signing and lab.dash_requested, "Shift dash")
+	lab._reset()
+	key(lab, KEY_F4)
+	check(lab.layout == 2, "double tap layout")
+	key(lab, KEY_SPACE)
+	check(lab.jump_requested and not lab.dash_requested, "first Space jumps")
+	lab._step(1.0 / 60.0)
+	key(lab, KEY_SPACE, false)
+	key(lab, KEY_SPACE)
+	check(lab.dash_requested and not lab.jump_requested, "quick second Space dashes")
+	lab._reset()
+	key(lab, KEY_SPACE)
+	lab._step(1.0 / 60.0)
+	lab.clock += 0.35
+	key(lab, KEY_SPACE, false)
+	key(lab, KEY_SPACE)
+	check(lab.jump_requested and not lab.dash_requested, "late second Space jumps")
+	lab._reset()
+	key(lab, KEY_F4)
+	mouse(lab)
+	check(lab.layout == 3 and lab.signing, "RMB + double tap preset")
+	mouse(lab, false)
+	key(lab, KEY_F4)
+	check(lab.layout == 4, "original Tab preset")
+	lab._reset()
 	key(lab, KEY_TAB)
 	key(lab, KEY_W)
 	key(lab, KEY_D)
