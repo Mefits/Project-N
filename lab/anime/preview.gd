@@ -12,6 +12,9 @@ var ref_frames:Array[Dictionary]=[]
 var ref_contact:int=-1
 var lunge_hit:Dictionary={}
 var lunge_miss:Dictionary={}
+var combo_direct:Array[Dictionary]=[]
+var combo_staged:Array[Dictionary]=[]
+var combo_clock:Array[int]=[]
 const OLD_SKIN=preload("res://game/fighter_skin.gd")
 const EXTRA_HOLD=[0,2,4,6] # additional 120 Hz ticks; only in replay C
 var tick:float=0
@@ -23,6 +26,7 @@ var info:Label
 func _ready()->void:
     _build_reference()
     _build_lunge()
+    _build_reference_combo()
     var bar:=HBoxContainer.new()
     bar.position=Vector2(12,8)
     add_child(bar)
@@ -53,8 +57,7 @@ func _button(bar:HBoxContainer,txt:String,cb:Callable)->void:
 func seek(t:float)->void:
     tick=clampf(t,0,220)
     slider.set_value_no_signal(tick)
-    var f:Dictionary=lunge_hit.frames[int(tick)]
-    info.text="N 0.10.3f  ·  %03d / 220  ·  %.0f мс  ·  B: %d/1  ·  %s  ·  %.1f×"%[int(tick),tick*1000/120,f.hits,"HITSTOP" if f.frozen else "",speed]
+    info.text="N 0.10.3g  ·  %03d / 220  ·  %.0f мс  ·  Pain / solo choreography  ·  %.1f×"%[int(tick),tick*1000/120,speed]
     queue_redraw()
 func _process(dt:float)->void:
     if playing:seek(fposmod(tick+120*dt*speed,221))
@@ -66,23 +69,20 @@ func _skeleton(p:Dictionary,c:Color)->void:
     for k in p:draw_circle(p[k],2.5,c)
 func _draw()->void:
     draw_rect(Rect2(0,0,960,540),Color("#172632"))
-    var names:Array=["A  ·  0.10.3e B / старый контакт","B  ·  Выпад / новый контакт","C  ·  Тот же выпад / промах"]
-    for variant in range(3):
-        var y:float=66+157*variant
-        var floor_y:float=y+143
-        draw_rect(Rect2(10,y,940,149),Color("#213542"))
-        draw_string(ThemeDB.fallback_font,Vector2(22,y+24),names[variant],HORIZONTAL_ALIGNMENT_LEFT,-1,15,Color("#e2e7eb"))
+    var names:Array=["A  ·  Перенос поз / плавно","B  ·  Те же позы / резкая постановка"]
+    for variant in range(2):
+        var y:float=66+235*variant
+        var floor_y:float=y+218
+        draw_rect(Rect2(10,y,940,229),Color("#213542"))
+        draw_string(ThemeDB.fallback_font,Vector2(22,y+24),names[variant],HORIZONTAL_ALIGNMENT_LEFT,-1,16,Color("#e2e7eb"))
         draw_line(Vector2(12,floor_y),Vector2(948,floor_y),Color("#82968e"),1)
-        var source_tick:int=mini(int(tick),ref_frames.size()-1)
-        var sample_frame:Dictionary=ref_record.frames[source_tick]
-        var p:Dictionary=ref_frames[source_tick][1] if variant==0 else (lunge_hit.frames[int(tick)] if variant==1 else lunge_miss.frames[int(tick)])
+        var source_tick:int=combo_clock[int(tick)] if variant==1 else int(tick)
+        var p:Dictionary=combo_staged[source_tick] if variant==1 else combo_direct[source_tick]
+        var phase:String="Подготовка" if source_tick<24 else ("Выпад" if source_tick<=32 else ("Удар сверху" if source_tick<=52 else ("Разворот / удар ногой" if source_tick<=84 else "Приземление")))
+        draw_string(ThemeDB.fallback_font,Vector2(620,y+24),phase,HORIZONTAL_ALIGNMENT_LEFT,-1,14,Color("#b6c6d0"))
         draw_set_transform(Vector2(10,floor_y-430),0,Vector2.ONE)
-        if bones:
-            _skeleton(p.a,Color("#6daac8"))
-            _skeleton(p.b,Color("#c88b72"))
-        else:
-            SKIN.draw(self,p.a,int(sample_frame.a.face),Color("#6daac8"))
-            SKIN.draw(self,p.b,int(sample_frame.b.face),Color("#c88b72"))
+        if bones:_skeleton(p,Color("#6daac8"))
+        else:SKIN.draw(self,p,1,Color("#6daac8"))
         draw_set_transform(Vector2.ZERO)
 
 # 0.10.3c original authored hypothesis. Same world, positions, hits and support.
@@ -570,3 +570,104 @@ func _build_lunge()->void:
                 var frozen_frame:Dictionary=trial.frames[trial.hit+i]
                 if frozen_frame.a!=hit_frame.a or frozen_frame.b!=hit_frame.b:push_error("Lunge frozen pose changed")
     print("N 0.10.3f lunge: hit tick ",lunge_hit.hit," age ",lunge_hit.age," distance ",lunge_hit.distance," whiff ",lunge_miss.hit," mirrored ",mirror.age," hold ",lunge_hit.hold," root max step ",lunge_hit.max_step)
+
+# 0.10.3g, source-only reference: user archive 2d anim ref.zip, 54569.png
+# Pain, Naruto Shinobi Rumble, sheet ripped by ShadeDBZ.
+# Original sheet y=458..610; second row, ten cells, x=0..1039.
+# Visually estimated joints in a 2x crop, local to each cell. Smear cells 1
+# and 8 omitted; cell 4 included as approximate downswing, obscured joints
+# estimated under cloak. Attack labels are our interpretation, not extracted
+# move names. The user identified 0.10.3e/f as CHIDORI; preserve it separately.
+# Source FPS and exact displacement unknown. Timeline, root path, landing,
+# and hold lengths authored for N. No source pixels or VFX in this study.
+# This is SOLO choreography: accents are not gameplay hitstop, no hit claims.
+# Joint order is REF_NAMES. Hip-relative normalization preserves silhouette.
+const PAIN_KEYS=[
+    [[73,85],[62,54],[59,20],[70,52],[99,64],[93,57],[53,48],[29,36],[44,37],[76,85],[88,105],[78,130],[65,86],[65,104],[42,128]],
+    [[75,87],[102,61],[111,36],[113,56],[133,55],[154,56],[95,62],[85,76],[74,72],[78,87],[87,104],[51,104],[67,87],[46,105],[19,115]],
+    [[66,87],[82,55],[94,27],[86,53],[103,72],[108,66],[75,48],[57,64],[72,75],[75,88],[88,105],[66,131],[60,85],[56,109],[62,123]],
+    [[75,94],[99,61],[113,43],[102,59],[116,72],[119,94],[91,52],[67,44],[62,54],[80,96],[79,117],[62,112],[70,94],[58,111],[42,125]],
+    [[82,78],[91,56],[106,46],[93,59],[99,83],[89,104],[86,51],[76,27],[57,30],[83,80],[73,109],[55,119],[74,80],[56,111],[36,134]],
+    [[63,82],[68,51],[64,22],[72,49],[81,28],[65,15],[59,48],[53,67],[64,72],[68,83],[82,95],[72,97],[57,84],[52,109],[35,132]],
+    [[64,78],[55,49],[38,31],[62,48],[83,49],[93,66],[49,48],[43,66],[15,68],[68,82],[80,95],[64,107],[57,83],[48,112],[45,137]],
+    [[54,85],[43,56],[32,30],[43,48],[51,68],[39,77],[31,47],[16,67],[15,49],[58,82],[88,63],[122,48],[51,88],[40,109],[57,116]]
+]
+# tick, source key (-1 guard), authored hip root in px, curve type to this key.
+# Three linked motions; gather poses are outgoing poses, not idle resets.
+const COMBO_BEATS=[
+    [0,-1,Vector2(365,379),0],
+    [12,-1,Vector2(365,379),0],
+    [24,0,Vector2(391,359),0],
+    [32,1,Vector2(438,335),1],
+    [42,2,Vector2(460,326),0],
+    [48,3,Vector2(477,328),1],
+    [52,4,Vector2(489,335),1],
+    [60,5,Vector2(502,337),0],
+    [68,6,Vector2(518,341),0],
+    [76,7,Vector2(552,348),1],
+    [82,7,Vector2(557,355),0],
+    [96,2,Vector2(575,372),0],
+    [112,-1,Vector2(585,379),0],
+    [220,-1,Vector2(585,379),0]
+]
+const COMBO_ACCENTS={32:4,52:6,76:8}
+
+func _combo_key(index:int,root_pos:Vector2)->Dictionary:
+    var p:Dictionary={}
+    if index<0:
+        var source:Dictionary=ref_record.frames[0].a.points
+        var offset:Vector2=Vector2(root_pos.x,430.0)-Vector2(ref_record.frames[0].a.pos)
+        for k in source:p[k]=Vector2(source[k])+offset
+        return p
+    var raw:Array=PAIN_KEYS[index]
+    var origin:=Vector2(float(raw[0][0]),float(raw[0][1]))
+    for n in range(REF_NAMES.size()):
+        var q:=Vector2(float(raw[n][0]),float(raw[n][1]))
+        p[REF_NAMES[n]]=root_pos+(q-origin)*.90
+    return p
+
+func _combo_pose(t:int,staged:bool)->Dictionary:
+    for n in range(1,COMBO_BEATS.size()):
+        var a:Array=COMBO_BEATS[n-1]
+        var b:Array=COMBO_BEATS[n]
+        if t>int(b[0]):continue
+        var u:float=clampf(float(t-int(a[0]))/float(int(b[0])-int(a[0])),0,1)
+        var curve:float=smoothstep(0.0,1.0,u)
+        if staged and int(b[3])==1:
+            # Preserve the load, then sharply accelerate into the contact shape.
+            curve=pow(u,2.15)
+        var p:Dictionary=_mix_reference(_combo_key(int(a[1]),a[2]),_combo_key(int(b[1]),b[2]),curve)
+        return p
+    return _combo_key(-1,Vector2(585,379))
+
+func _build_reference_combo()->void:
+    var max_delta:float=0.0
+    var changed:int=0
+    var floor_error:float=0.0
+    for t in range(221):
+        var a:Dictionary=_combo_pose(t,false)
+        var b:Dictionary=_combo_pose(t,true)
+        combo_direct.append(a)
+        combo_staged.append(b)
+        if a!=b:changed+=1
+        for p in [a,b]:
+            for key in p:
+                if not Vector2(p[key]).is_finite():push_error("Combo nonfinite joint")
+            for side in ["near","far"]:
+                floor_error=maxf(floor_error,Vector2(p["foot_"+side]).y-430.0)
+        if t>0:
+            for key in b:
+                max_delta=maxf(max_delta,Vector2(b[key]).distance_to(combo_staged[t-1][key]))
+        combo_clock.append(t)
+        for repeat in range(int(COMBO_ACCENTS.get(t,0))):combo_clock.append(t)
+    # Check original pose preservation and deterministic visual holds.
+    for beat in COMBO_BEATS:
+        var expected:Dictionary=_combo_key(int(beat[1]),beat[2])
+        var t:int=int(beat[0])
+        for key in expected:
+            if Vector2(combo_direct[t][key]).distance_to(expected[key])>.001 or Vector2(combo_staged[t][key]).distance_to(expected[key])>.001:push_error("Combo key drift")
+    for beat in COMBO_ACCENTS:
+        var count:int=combo_clock.count(beat)
+        if count!=int(COMBO_ACCENTS[beat])+1:push_error("Combo accent hold count")
+    if combo_clock.size()!=239 or changed<10 or floor_error>.01 or max_delta>45.0:push_error("Combo continuity / floor / cadence")
+    print("N 0.10.3g solo combo: 8 reference poses, 3 linked strikes; accents ",COMBO_ACCENTS," staged frames changed ",changed," max point step ",max_delta," floor error ",floor_error)
