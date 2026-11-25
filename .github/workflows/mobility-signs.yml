@@ -1,0 +1,46 @@
+name: N mobility signs smoke
+on:
+  push:
+    branches: [experiment/mobility-signs]
+    paths:
+      - 'lab/mobility_signs/**'
+      - 'tests/mobility_signs.gd'
+      - '.github/workflows/mobility-signs.yml'
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: godot
+        with:
+          path: /tmp/godot
+          key: godot-4.4.1-linux-x86-64
+      - name: Install Godot
+        if: steps.godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/godot
+          curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          G=/tmp/godot/Godot_v4.4.1-stable_linux.x86_64
+          chmod +x "$G"
+          timeout 30s "$G" --headless --script res://tests/mobility_signs.gd 2>&1 | tee /tmp/mobility.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load|ERROR:' /tmp/mobility.log; then exit 1; fi
+          grep -F 'Mobility signs smoke: 0 failures' /tmp/mobility.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: N-mobility-signs-project
+          path: |
+            project.godot
+            game/
+            lab/
+            docs/
+            tests/
+            README.md
+            AGENTS.md
