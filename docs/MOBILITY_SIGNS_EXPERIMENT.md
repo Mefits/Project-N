@@ -1,4 +1,4 @@
-# N — mobility and hand signs / experiment 06.2
+# N — mobility and hand signs / experiment 06.3
 
 M4 accepted as provisional mobility base. Same 60 Hz sandbox, physics constants, coast, camera and jump velocity reset. Main N and Lab unchanged. Open project.godot in Godot 4.4.1 and F5.
 
@@ -13,3 +13,5 @@ M6: H H H confirmed three-hit chain, light damage 9/9, finisher 18. Light contac
 M6.1: AI disabled at initial launch (F3 toggles, R preserves selected mode). Starting any melee strike, including miss/block, cancels run and active dash momentum on both axes. No horizontal movement command during melee recovery; jump/dash commands cannot override that recovery. Gravity continues in air. Damage replaces previous motion with the attack's knockback, and ordinary movement input is suppressed in hitstun. Enemy attack also cancels its old motion. No automatic pursuit, body pushbox, or changes to mobility outside melee/hurt; spells retain previous mobility. Combo timing and damage unchanged.
 
 M6.2 correction (supersedes M5.2): owner wants the M4 light inertia, not near-immediate M3 braking and not original strong seal-only coast. Pin the accepted M4 values: no-input ground 660, air 120 px/s²; active acceleration 2900/1350. The motor never branches on Shift; seal input still suppresses movement command. Do not modify these constants without explicit owner direction. M6.1 melee stop and damage reaction remain separate; hitstun uses M6.1 reaction braking, not ordinary coasting. AI remains off by default.
+
+M6.3: Windows tester build, Russian HUD and notifications; J dash, K casts. All incoming and outgoing HP damage multiplied by 1/3 using floating-point HP, displayed to one decimal; stun, impulses, combo, movement and inertia unchanged. AI off by default. Export is an isolated self-contained Windows x86_64 executable with embedded PCK.

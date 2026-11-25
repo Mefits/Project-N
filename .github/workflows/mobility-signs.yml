@@ -11,7 +11,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -46,3 +46,34 @@ jobs:
             tests/
             README.md
             AGENTS.md
+      - uses: actions/cache@v4
+        id: windows_template
+        with:
+          path: ~/.local/share/godot/export_templates/4.4.1.stable/windows_release_x86_64.exe
+          key: godot-4.4.1-win64-release-template
+      - name: Install Windows export template
+        if: steps.windows_template.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
+          curl -fL --retry 3 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz -o /tmp/export_templates.tpz
+          unzip -p /tmp/export_templates.tpz templates/windows_release_x86_64.exe > "$HOME/.local/share/godot/export_templates/4.4.1.stable/windows_release_x86_64.exe"
+          test -s "$HOME/.local/share/godot/export_templates/4.4.1.stable/windows_release_x86_64.exe"
+      - name: Export standalone Windows tester
+        run: |
+          set -euo pipefail
+          G=/tmp/godot/Godot_v4.4.1-stable_linux.x86_64
+          mkdir -p /tmp/n-tester/lab/mobility_signs "$GITHUB_WORKSPACE/dist"
+          cp project.godot export_presets.cfg /tmp/n-tester/
+          cp lab/mobility_signs/*.gd lab/mobility_signs/*.tscn /tmp/n-tester/lab/mobility_signs/
+          "$G" --headless --path /tmp/n-tester --editor --import 2>&1 | tee /tmp/n-import.log
+          "$G" --headless --path /tmp/n-tester --export-release "Windows Tester" "$GITHUB_WORKSPACE/dist/N-M6.3.exe" 2>&1 | tee /tmp/n-export.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load|ERROR:' /tmp/n-import.log /tmp/n-export.log; then exit 1; fi
+          test -s dist/N-M6.3.exe
+          file dist/N-M6.3.exe | grep -E 'PE32\+.*x86-64'
+          test ! -f dist/N-M6.3.pck
+      - uses: actions/upload-artifact@v4
+        with:
+          name: N-M6.3-Windows
+          path: dist/N-M6.3.exe
+          if-no-files-found: error
