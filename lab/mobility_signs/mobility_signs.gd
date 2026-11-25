@@ -10,7 +10,11 @@ const DASH_SPEED := 850.0
 const COAST_GROUND := 660.0
 const COAST_AIR := 120.0
 const READY_TIME := 8.0
-const RECIPES := {"ASD": "Bolt", "ADAD": "Orb"}
+const RECIPES := {"ASD": "Bolt", "ADAD": "Orb", "ASDAS": "Spikes"}
+const MELEE_RANGE := 76.0
+const SPIKE_HEIGHT := 108.0
+const SPIKE_WIDTH := 190.0
+const MAX_HP := 100
 const BLUE := Color("#83baf2")
 const GOLD := Color("#efc276")
 const RED := Color("#ec8879")
@@ -31,6 +35,22 @@ var sequence := ""
 var prepared_spell := ""
 var ready_left := 0.0
 var moving_target := true
+var hp := MAX_HP
+var enemy_hp := MAX_HP
+var enemy_vel := Vector2.ZERO
+var enemy_grounded := true
+var enemy_hurt := 0.0
+var hurt := 0.0
+var melee_left := 0.0
+var enemy_attack_left := 0.0
+var enemy_cooldown := 0.0
+var enemy_facing := -1.0
+var facing := 1.0
+var attack_requested := false
+var guarding := false
+var melee_facing := 1.0
+var spikes: Array[Dictionary] = []
+var blocks := 0
 var shots: Array[Dictionary] = []
 var hits := 0
 var casts := 0
@@ -60,8 +80,16 @@ func _seal_modifier(down: bool) -> void:
 		sign_done = false
 		sequence = ""
 	elif not down:
+		if signing and not sign_done and RECIPES.has(sequence):
+			_prepare(String(RECIPES[sequence]))
 		signing = false
 		sequence = ""
+
+func _prepare(spell: String) -> void:
+	prepared_spell = spell
+	ready_left = READY_TIME
+	sign_done = true
+	_notice(spell + " ready - J to release")
 
 func _seal_key() -> int:
 	return KEY_SHIFT
@@ -102,27 +130,31 @@ func _input(event: InputEvent) -> void:
 					prepared_spell = ""
 					ready_left = 0.0
 				sequence += letter
+				var longer := false
+				for recipe in RECIPES:
+					if String(recipe).length() > sequence.length() and String(recipe).begins_with(sequence):
+						longer = true
 				if RECIPES.has(sequence):
-					prepared_spell = RECIPES[sequence]
-					ready_left = READY_TIME
-					sign_done = true
-					_notice(prepared_spell + " ready - J to release")
-				else:
-					var prefix := false
-					for recipe in RECIPES:
-						if String(recipe).begins_with(sequence):
-							prefix = true
-					if not prefix:
-						_notice("Wrong seal - try again")
-						sequence = ""
+					if not longer:
+						_prepare(String(RECIPES[sequence]))
+					else:
+						_notice("Release SHIFT for Bolt, or continue A S")
+				elif not longer:
+					_notice("Wrong seal - try again")
+					sequence = ""
 			return
 		match k:
 			KEY_SPACE: _space_press()
 			KEY_K: dash_requested = true
-			KEY_J: cast_requested = true
-			KEY_L: _cancel()
+			KEY_J:
+				if signing and not sign_done and RECIPES.has(sequence):
+					_prepare(String(RECIPES[sequence]))
+				cast_requested = true
+			KEY_H: attack_requested = true
 			KEY_F3:
 				moving_target = not moving_target
+				enemy_vel = Vector2.ZERO
+				enemy_attack_left = 0.0
 			KEY_F4:
 				layout = (layout + 1) % LAYOUTS.size()
 				_seal_modifier(false)
@@ -155,6 +187,22 @@ func _reset() -> void:
 	air_dashes = 2
 	air_jump = true
 	shots.clear()
+	spikes.clear()
+	hp = MAX_HP
+	enemy_hp = MAX_HP
+	target = Vector2(1250, FLOOR - 30)
+	enemy_vel = Vector2.ZERO
+	enemy_grounded = true
+	enemy_hurt = 0.0
+	hurt = 0.0
+	melee_left = 0.0
+	enemy_attack_left = 0.0
+	enemy_cooldown = 0.0
+	enemy_facing = -1.0
+	facing = 1.0
+	guarding = false
+	attack_requested = false
+	blocks = 0
 	hits = 0
 	casts = 0
 	clock = 0.0
@@ -204,7 +252,13 @@ func _try_jump(x: float) -> bool:
 	return true
 
 func _step(dt: float) -> void:
+	if hp <= 0 or enemy_hp <= 0:
+		queue_redraw()
+		return
 	clock += dt
+	hurt = maxf(0.0, hurt - dt)
+	enemy_hurt = maxf(0.0, enemy_hurt - dt)
+	melee_left = maxf(0.0, melee_left - dt)
 	message_left = maxf(0.0, message_left - dt)
 	dash_cooldown = maxf(0.0, dash_cooldown - dt)
 	if not prepared_spell.is_empty():
@@ -213,15 +267,25 @@ func _step(dt: float) -> void:
 			prepared_spell = ""
 			_notice("Technique expired")
 	_update_aim()
-	var move_x := 0.0 if signing else _axis()
+	if absf(aim.x) > 0.05:
+		facing = signf(aim.x)
+	guarding = Input.is_physical_key_pressed(KEY_I) and hurt <= 0.0 and melee_left <= 0.0 and dash_left <= 0.0
+	var move_x := 0.0 if signing or guarding or hurt > 0.0 else _axis()
+	if attack_requested:
+		if not guarding and hurt <= 0.0 and melee_left <= 0.0:
+			_melee()
+		attack_requested = false
 	if jump_requested:
-		_try_jump(move_x)
+		if hurt <= 0.0 and not guarding:
+			_try_jump(move_x)
 		jump_requested = false
 	if dash_requested:
-		_start_dash(aim)
+		if hurt <= 0.0 and not guarding:
+			_start_dash(aim)
 		dash_requested = false
 	if cast_requested:
-		_cast()
+		if hurt <= 0.0 and not guarding:
+			_cast()
 		cast_requested = false
 	if dash_left > 0.0:
 		dash_left = maxf(0.0, dash_left - dt)
@@ -251,10 +315,8 @@ func _step(dt: float) -> void:
 			dash_left = 0.0
 	else:
 		grounded = false
-	if moving_target:
-		target = Vector2(1350.0 + sin(clock * 0.73) * 520.0, FLOOR - 30.0 - pow(maxf(0.0, sin(clock * 1.3)), 1.5) * 245.0)
-	else:
-		target = Vector2(1350, FLOOR - 30)
+	_update_enemy(dt)
+	_update_spikes(dt)
 	for i in range(shots.size() - 1, -1, -1):
 		var s: Dictionary = shots[i]
 		var old: Vector2 = s["p"]
@@ -262,8 +324,7 @@ func _step(dt: float) -> void:
 		s["p"] = next
 		s["life"] -= dt
 		if Geometry2D.get_closest_point_to_segment(target, old, next).distance_to(target) <= float(s["r"]) + 20.0:
-			hits += 1
-			_notice("Hit!  " + str(hits))
+			_hit_enemy(int(s["damage"]), Vector2(s["v"]).normalized() * 270.0 + Vector2(0, -65))
 			shots.remove_at(i)
 		elif s["life"] <= 0.0 or next.x < 0 or next.x > WORLD_W or next.y < 0 or next.y > FLOOR:
 			shots.remove_at(i)
@@ -275,6 +336,99 @@ func _step(dt: float) -> void:
 	zoom = lerpf(zoom, wanted_zoom, minf(dt * 5.0, 1.0))
 	camera = camera.lerp(focus, minf(dt * 6.0, 1.0))
 	queue_redraw()
+
+func _melee() -> void:
+	melee_left = 0.32
+	melee_facing = facing
+	var delta := target - _center()
+	if delta.length() <= MELEE_RANGE and delta.x * melee_facing >= -10.0:
+		_hit_enemy(9, Vector2(melee_facing * 300.0, -155.0))
+	else:
+		_notice("Melee miss")
+
+func _hit_enemy(damage: int, impulse: Vector2) -> void:
+	if enemy_hp <= 0:
+		return
+	enemy_hp = maxi(0, enemy_hp - damage)
+	enemy_hurt = 0.24
+	enemy_vel = impulse
+	enemy_grounded = false
+	enemy_attack_left = 0.0
+	enemy_cooldown = 0.4
+	hits += 1
+	_notice("Hit!  " + str(hits))
+
+func _hit_player(damage: int, impulse: Vector2, source: Vector2) -> void:
+	if hp <= 0 or hurt > 0.0:
+		return
+	# Simple frontal guard, including air; no parry or resource cost.
+	if guarding and (source.x - pos.x) * facing >= -3.0:
+		blocks += 1
+		vel.x = impulse.x * 0.22
+		_notice("Blocked")
+		return
+	hp = maxi(0, hp - damage)
+	hurt = 0.23
+	dash_left = 0.0
+	melee_left = 0.0
+	vel = impulse
+	grounded = false
+	# Do not modify signing, sequence, prepared_spell or ready_left.
+	_notice("Hit received")
+
+func _update_enemy(dt: float) -> void:
+	enemy_cooldown = maxf(0.0, enemy_cooldown - dt)
+	var delta := _center() - target
+	if enemy_attack_left > 0.0:
+		var old := enemy_attack_left
+		enemy_attack_left = maxf(0.0, old - dt)
+		if old > 0.12 and enemy_attack_left <= 0.12:
+			if delta.length() <= MELEE_RANGE + 8.0 and delta.x * enemy_facing >= -10.0:
+				_hit_player(8, Vector2(enemy_facing * 330.0, -120.0), target)
+	if enemy_hurt <= 0.0:
+		if moving_target and enemy_attack_left <= 0.0:
+			if absf(delta.x) > 4.0:
+				enemy_facing = signf(delta.x)
+			if delta.length() <= MELEE_RANGE and enemy_cooldown <= 0.0:
+				enemy_attack_left = 0.30
+				enemy_cooldown = 0.95
+				enemy_vel.x = 0.0
+			else:
+				var desired := enemy_facing * 345.0 if absf(delta.x) > 42.0 else 0.0
+				enemy_vel.x = move_toward(enemy_vel.x, desired, 1700.0 * dt)
+				if enemy_grounded and delta.y < -95.0:
+					enemy_vel.y = JUMP * 0.94
+					enemy_grounded = false
+		else:
+			enemy_vel.x = move_toward(enemy_vel.x, 0.0, 1300.0 * dt)
+	else:
+		enemy_vel.x = move_toward(enemy_vel.x, 0.0, 200.0 * dt)
+	if not enemy_grounded:
+		enemy_vel.y += GRAVITY * dt
+	target += enemy_vel * dt
+	target.x = clampf(target.x, 24.0, WORLD_W - 24.0)
+	if target.y >= FLOOR - 30.0:
+		target.y = FLOOR - 30.0
+		enemy_vel.y = 0.0
+		enemy_grounded = true
+	elif target.y < 32.0:
+		target.y = 32.0
+		enemy_vel.y = maxf(enemy_vel.y, 0.0)
+
+func _update_spikes(dt: float) -> void:
+	for i in range(spikes.size() - 1, -1, -1):
+		var s: Dictionary = spikes[i]
+		s["age"] += dt
+		var age: float = s["age"]
+		if age >= 0.65:
+			spikes.remove_at(i)
+			continue
+		if age >= 0.22 and age < 0.48 and not s["hit"]:
+			var area := Rect2(float(s["x"]), FLOOR - SPIKE_HEIGHT, SPIKE_WIDTH, SPIKE_HEIGHT)
+			if area.grow(18.0).has_point(target):
+				s["hit"] = true
+				_hit_enemy(20, Vector2(float(s["dir"]) * 170.0, -420.0))
+		spikes[i] = s
 
 func _start_dash(d: Vector2) -> bool:
 	if dash_cooldown > 0.0 or dash_left > 0.0 or (not grounded and air_dashes <= 0):
@@ -298,8 +452,12 @@ func _cast() -> void:
 	prepared_spell = ""
 	ready_left = 0.0
 	casts += 1
-	var orb := spell == "Orb"
-	shots.append({"p":_center() + aim * 28.0, "v":aim * (610.0 if orb else 1250.0), "r":24.0 if orb else 9.0, "life":2.8 if orb else 1.8, "c":GOLD if orb else BLUE})
+	if spell == "Spikes":
+		var edge := pos.x + (35.0 if facing > 0 else -35.0 - SPIKE_WIDTH)
+		spikes.append({"x":clampf(edge, 0.0, WORLD_W - SPIKE_WIDTH), "dir":facing, "age":0.0, "hit":false})
+	else:
+		var orb := spell == "Orb"
+		shots.append({"p":_center() + aim * (40.0 if orb else 28.0), "v":aim * (488.0 if orb else 1250.0), "r":36.0 if orb else 9.0, "life":2.8 if orb else 1.8, "c":GOLD if orb else BLUE, "damage":16 if orb else 8})
 	_notice(spell + " released")
 
 func _label(at: Vector2, value: String, size: int = 14, color: Color = Color.WHITE) -> void:
@@ -326,8 +484,25 @@ func _draw() -> void:
 	draw_line(Vector2(0, FLOOR), Vector2(WORLD_W, FLOOR), Color("#7890a7"), 2.0)
 	draw_rect(Rect2(0, 0, WORLD_W, FLOOR), Color("#526477"), false, 2.0)
 	draw_line(_center(), _center() + aim * 105.0, Color(BLUE, 0.55), 2.0)
-	_fighter(pos, BLUE, 1.0 if aim.x >= 0 else -1.0)
-	_fighter(target + Vector2(0, 30), RED, -1.0 if pos.x < target.x else 1.0)
+	_fighter(pos, BLUE.lightened(0.4) if hurt > 0 else BLUE, facing)
+	_fighter(target + Vector2(0, 30), RED.lightened(0.4) if enemy_hurt > 0 else RED, enemy_facing)
+	if guarding:
+		draw_arc(_center(), 34.0, -1.3 if facing > 0 else 1.84, 1.3 if facing > 0 else 4.44, 22, BLUE, 4.0, true)
+	if melee_left > 0.20:
+		draw_line(_center(), _center() + Vector2(melee_facing * MELEE_RANGE, 0), BLUE, 6.0, true)
+	if enemy_attack_left > 0.0:
+		draw_arc(target, 32.0, 0.0, TAU, 24, GOLD if enemy_attack_left > 0.12 else RED, 3.0, true)
+		if enemy_attack_left <= 0.12:
+			draw_line(target, target + Vector2(enemy_facing * MELEE_RANGE, 0), RED, 6.0, true)
+	for s in spikes:
+		var x: float = s["x"]
+		var age: float = s["age"]
+		draw_rect(Rect2(x, FLOOR - 5.0, SPIKE_WIDTH, 5.0), GOLD)
+		if age >= 0.22:
+			var h := SPIKE_HEIGHT * clampf((age - 0.22) / 0.065, 0.0, 1.0) * clampf((0.65 - age) / 0.17, 0.0, 1.0)
+			for i in range(5):
+				var sx := x + 38.0 * i
+				draw_colored_polygon(PackedVector2Array([Vector2(sx, FLOOR), Vector2(sx + 20.0, FLOOR - h * (0.8 + 0.2 * (i % 2))), Vector2(sx + 38.0, FLOOR)]), Color("#b4a087"))
 	draw_circle(target, 20, Color(RED, 0.15))
 	for s in shots:
 		draw_circle(s["p"], s["r"], s["c"])
@@ -344,13 +519,22 @@ func _draw() -> void:
 		draw_rect(Rect2(bar, Vector2(84.0 * ready_left / READY_TIME, 5)), GOLD)
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
-	_label(Vector2(16, 24), "N / mobility + hand signs   |   60 Hz sandbox", 20, BLUE)
+	_label(Vector2(16, 24), "N / M5 combat + seals", 20, BLUE)
 	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout], 14)
-	_label(Vector2(16, 69), "Arrows: optional independent aim   L / ESC cancel   F3 target   F4 layout   R reset", 14)
-	_label(Vector2(dims.x - 230, 24), "M4 / COAST", 15, GOLD)
+	_label(Vector2(16, 69), "H melee   I guard   ESC cancel   F3 AI on/off   F4 layout   R reset", 14)
+	_label(Vector2(dims.x - 230, 24), "COAST / " + ("AI ON" if moving_target else "AI OFF"), 15, GOLD)
+	var hp_width := 140.0
+	_label(Vector2(16, 86), "P1 %d" % hp, 12, BLUE)
+	draw_rect(Rect2(80, 76, hp_width, 9), Color("#34485c"))
+	draw_rect(Rect2(80, 76, hp_width * hp / MAX_HP, 9), BLUE)
+	_label(Vector2(dims.x - 212, 86), "CPU %d" % enemy_hp, 12, RED)
+	draw_rect(Rect2(dims.x - 156, 76, hp_width, 9), Color("#34485c"))
+	draw_rect(Rect2(dims.x - 156, 76, hp_width * enemy_hp / MAX_HP, 9), RED)
+	if hp <= 0 or enemy_hp <= 0:
+		_label(dims * 0.5 - Vector2(90, 0), ("WIN" if enemy_hp <= 0 else "DEFEAT") + " / R reset", 24, GOLD)
 	var bottom := dims.y - 86.0
 	draw_rect(Rect2(0, bottom, dims.x, 86), Color("#111a27"))
-	_label(Vector2(16, bottom + 21), "BOLT: A S D     ORB: A D A D", 16, GOLD)
+	_label(Vector2(16, bottom + 21), "BOLT: A S D     FIREBALL: A D A D     SPIKES: A S D A S", 16, GOLD)
 	_label(Vector2(16, bottom + 44), "Air dashes: %d/2    Double jump: %s    Casts: %d    Hits: %d" % [air_dashes, "ready" if air_jump else "used", casts, hits], 14)
 	var status := ("Signs: " + sequence) if signing else "Move freely"
 	if layout == 1 and not signing and prepared_spell.is_empty():
