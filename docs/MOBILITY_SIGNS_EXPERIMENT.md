@@ -1,0 +1,7 @@
+# N — mobility and hand signs / experiment 01
+
+Open `res://lab/mobility_signs/mobility_signs.tscn` in Godot 4.4.1 and press F6. Alternatively from the project directory: `godot --path . res://lab/mobility_signs/mobility_signs.tscn`. The normal game and animation preview are unchanged. The isolated sandbox uses a 60 Hz logical update on top of the existing 120 Hz physics setting.
+
+A/D move, Space jump/double jump, Shift dash toward cursor. Hold Tab and enter WDS (Bolt), SWDW (Orb), ADW (Rush). Re-press Tab to start a new sequence. Release Tab to restore directional control, left click to cast within 8 seconds, right click to cancel. F2 compares coast (ground deceleration, gentle air drag) and latch (retain direction sampled on entering signs). F3 toggles moving target; R reset. Aim, jumps and dashes are available during preparation. No invulnerability, two air dashes per landing, double jump, no ordinary melee or hitstun. Rush is an experimental technique with its own dash. Placeholder signs use letters; not canonical. Camera, timing and controls are tentative. No integration into Lab or main arena, no final animation claims.
+
+Test: run then enter seals; jump then enter seals; dash then enter seals; prepare then aim at moving target; compare F2 modes; cancel and expire. Note accidental inputs, ability to evade, comfort with Tab/Shift and mouse, and which direction control is preferable. No real opponent attacks yet, so interruption balance is deferred.
