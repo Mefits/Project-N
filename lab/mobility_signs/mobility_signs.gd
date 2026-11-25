@@ -7,8 +7,8 @@ const RUN := 420.0
 const GRAVITY := 1250.0
 const JUMP := -760.0
 const DASH_SPEED := 850.0
-const COAST_GROUND := 660.0
-const COAST_AIR := 120.0
+const MOTOR_GROUND := 2900.0
+const MOTOR_AIR := 1350.0
 const READY_TIME := 8.0
 const RECIPES := {"ASD": "Bolt", "ADAD": "Orb", "ASDAS": "Spikes"}
 const MELEE_RANGE := 76.0
@@ -243,11 +243,8 @@ func _physics_process(delta: float) -> void:
 		_step(STEP)
 
 func _move_horizontal(x: float, dt: float) -> void:
-	# Coast all the time with no movement input, including during seals.
-	if is_zero_approx(x):
-		vel.x = move_toward(vel.x, 0.0, (COAST_GROUND if grounded else COAST_AIR) * dt)
-	else:
-		vel.x = move_toward(vel.x, x * RUN, (2900.0 if grounded else 1350.0) * dt)
+	# Same ordinary M3 motor for acceleration and braking, with or without seals.
+	vel.x = move_toward(vel.x, x * RUN, (MOTOR_GROUND if grounded else MOTOR_AIR) * dt)
 
 func _try_jump(x: float) -> bool:
 	if not grounded and not air_jump:
@@ -579,7 +576,7 @@ func _draw() -> void:
 		draw_rect(Rect2(bar, Vector2(84.0 * ready_left / READY_TIME, 5)), GOLD)
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
-	_label(Vector2(16, 24), "N / M5.1 combat + seals", 20, BLUE)
+	_label(Vector2(16, 24), "N / M5.2 combat + seals", 20, BLUE)
 	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout], 14)
 	_label(Vector2(16, 69), "H melee   S guard   ESC cancel   F1 hitboxes   F3 AI   F4 layout   R reset", 14)
 	_label(Vector2(dims.x - 255, 24), ("BOX ON" if show_hitboxes else "BOX OFF") + " / " + ("AI ON" if moving_target else "AI OFF"), 15, GOLD)
