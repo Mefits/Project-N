@@ -15,6 +15,7 @@ var lunge_miss:Dictionary={}
 var combo_direct:Array[Dictionary]=[]
 var combo_staged:Array[Dictionary]=[]
 var combo_clock:Array[int]=[]
+var combo_clean:Array[Dictionary]=[]
 const OLD_SKIN=preload("res://game/fighter_skin.gd")
 const EXTRA_HOLD=[0,2,4,6] # additional 120 Hz ticks; only in replay C
 var tick:float=0
@@ -27,6 +28,7 @@ func _ready()->void:
     _build_reference()
     _build_lunge()
     _build_reference_combo()
+    _build_passive_cleanup()
     var bar:=HBoxContainer.new()
     bar.position=Vector2(12,8)
     add_child(bar)
@@ -57,7 +59,7 @@ func _button(bar:HBoxContainer,txt:String,cb:Callable)->void:
 func seek(t:float)->void:
     tick=clampf(t,0,220)
     slider.set_value_no_signal(tick)
-    info.text="N 0.10.3g  ·  %03d / 220  ·  %.0f мс  ·  Pain / solo choreography  ·  %.1f×"%[int(tick),tick*1000/120,speed]
+    info.text="N 0.10.3h  ·  %03d / 220  ·  %.0f мс  ·  Pain / passive limb cleanup  ·  %.1f×"%[int(tick),tick*1000/120,speed]
     queue_redraw()
 func _process(dt:float)->void:
     if playing:seek(fposmod(tick+120*dt*speed,221))
@@ -69,15 +71,15 @@ func _skeleton(p:Dictionary,c:Color)->void:
     for k in p:draw_circle(p[k],2.5,c)
 func _draw()->void:
     draw_rect(Rect2(0,0,960,540),Color("#172632"))
-    var names:Array=["A  ·  Перенос поз / плавно","B  ·  Те же позы / резкая постановка"]
+    var names:Array=["A  ·  0.10.3g B / исходная","B  ·  Контроль свободных конечностей"]
     for variant in range(2):
         var y:float=66+235*variant
         var floor_y:float=y+218
         draw_rect(Rect2(10,y,940,229),Color("#213542"))
         draw_string(ThemeDB.fallback_font,Vector2(22,y+24),names[variant],HORIZONTAL_ALIGNMENT_LEFT,-1,16,Color("#e2e7eb"))
         draw_line(Vector2(12,floor_y),Vector2(948,floor_y),Color("#82968e"),1)
-        var source_tick:int=combo_clock[int(tick)] if variant==1 else int(tick)
-        var p:Dictionary=combo_staged[source_tick] if variant==1 else combo_direct[source_tick]
+        var source_tick:int=combo_clock[int(tick)]
+        var p:Dictionary=combo_clean[source_tick] if variant==1 else combo_staged[source_tick]
         var phase:String="Подготовка" if source_tick<24 else ("Выпад" if source_tick<=32 else ("Удар сверху" if source_tick<=52 else ("Разворот / удар ногой" if source_tick<=84 else "Приземление")))
         draw_string(ThemeDB.fallback_font,Vector2(620,y+24),phase,HORIZONTAL_ALIGNMENT_LEFT,-1,14,Color("#b6c6d0"))
         draw_set_transform(Vector2(10,floor_y-430),0,Vector2.ONE)
@@ -671,3 +673,107 @@ func _build_reference_combo()->void:
         if count!=int(COMBO_ACCENTS[beat])+1:push_error("Combo accent hold count")
     if combo_clock.size()!=239 or changed<10 or floor_error>.01 or max_delta>45.0:push_error("Combo continuity / floor / cadence")
     print("N 0.10.3g solo combo: 8 reference poses, 3 linked strikes; accents ",COMBO_ACCENTS," staged frames changed ",changed," max point step ",max_delta," floor error ",floor_error)
+
+# 0.10.3h: passive-limb cleanup. Same staging clock, body/root and striking
+# tracks. Original source keys stay untouched in PAIN_KEYS.
+# Explicit passive direction keys: upper segment angle, signed joint bend.
+# Degrees in facing-right canvas coordinates (right=0, down=90).
+# These are authored corrections for hidden/uncertain limbs, not measured data.
+# t, near arm, far arm, near leg, far leg (upper, bend for each).
+const PASSIVE_KEYS=[
+    [12, 100,-115, 110,-105, 65,55, 95,40],
+    [24, 95,-100, 130,-85, 62,65, 100,40],
+    [32, 115,-105, 150,-75, 80,85, 128,32],
+    [42, 95,-110, 120,-90, 48,95, 100,65],
+    [52, 105,-100, 205,-65, 75,80, 120,35],
+    [60, 100,-110, 150,-85, 48,100, 112,36],
+    [68, 120,-95, 155,-35, 45,95, 100,45],
+    [76, 110,-115, 125,-95, 5,0, 75,85],
+    [82, 100,-115, 110,-105, 25,55, 82,80],
+    [96, 90,-115, 108,-100, 60,75, 85,55],
+    [112, 100,-115, 110,-105, 65,55, 95,40]
+]
+
+func _passive_angles(t:int,channel:int)->Vector2:
+    var col:int=1+channel*2
+    for i in range(1,PASSIVE_KEYS.size()):
+        var a:Array=PASSIVE_KEYS[i-1]
+        var b:Array=PASSIVE_KEYS[i]
+        if t>int(b[0]):continue
+        var u:float=smoothstep(float(a[0]),float(b[0]),float(t))
+        return Vector2(lerpf(float(a[col]),float(b[col]),u),lerpf(float(a[col+1]),float(b[col+1]),u))
+    return Vector2(float(PASSIVE_KEYS[-1][col]),float(PASSIVE_KEYS[-1][col+1]))
+
+func _passive_weight(t:int,channel:int)->float:
+    # Fade near the guard. Keep striking arm and kick leg exactly as authored
+    # over their complete delivery / accent windows. No changes to hit timing.
+    var v:float=float(t)
+    var w:float=smoothstep(12.0,24.0,v)*(1.0-smoothstep(96.0,112.0,v))
+    if channel==0:w*=1.0-smoothstep(16.0,24.0,v)*(1.0-smoothstep(52.0,60.0,v))
+    if channel==2:w*=1.0-smoothstep(60.0,68.0,v)*(1.0-smoothstep(82.0,96.0,v))
+    return w
+
+func _clean_chain(p:Dictionary,raw:Dictionary,t:int,channel:int)->void:
+    var w:float=_passive_weight(t,channel)
+    if w<=.00001:return
+    var leg:bool=channel>=2
+    var side:String="near" if channel%2==0 else "far"
+    var anchor:String=("thigh_" if leg else "shoulder_")+side
+    var joint:String=("knee_" if leg else "elbow_")+side
+    var tip:String=("foot_" if leg else "hand_")+side
+    var a:Vector2=raw[anchor]
+    var d1:Vector2=Vector2(raw[joint])-a
+    var d2:Vector2=Vector2(raw[tip])-Vector2(raw[joint])
+    var angles:Vector2=_passive_angles(t,channel)
+    # Parent-space rotation: follow part of torso inclination rather than
+    # drag wrist/elbow positions independently in screen space.
+    var torso:Vector2=Vector2(raw.chest)-Vector2(raw.hips)
+    var tilt:float=wrapf(torso.angle()+PI*.5,-PI,PI)
+    var upper:float=lerp_angle(d1.angle(),deg_to_rad(angles.x)+tilt*(.30 if leg else .55),w)
+    var bend:float=lerp_angle(d1.angle_to(d2),deg_to_rad(angles.y),w)
+    var l1:float=lerpf(d1.length(),26.0 if leg else 20.0,w)
+    var l2:float=lerpf(d2.length(),27.0 if leg else 21.0,w)
+    var k:Vector2=a+Vector2.from_angle(upper)*l1
+    var b:Vector2=k+Vector2.from_angle(upper+bend)*l2
+    if leg and b.y>428.0:
+        var floor_target:=Vector2(b.x,428.0)
+        var solution:Array[Vector2]=REF_RIG.chain(a,floor_target,l1,l2,-1.0)
+        k=solution[0]
+        b=solution[1]
+    p[joint]=k
+    p[tip]=b
+
+func _build_passive_cleanup()->void:
+    var changed:int=0
+    var fully_corrected:int=0
+    var length_error:float=0.0
+    var max_step:float=0.0
+    var floor_error:float=0.0
+    for t in range(combo_staged.size()):
+        var raw:Dictionary=combo_staged[t]
+        var p:Dictionary=raw.duplicate(true)
+        for channel in range(4):_clean_chain(p,raw,t,channel)
+        combo_clean.append(p)
+        if p!=raw:changed+=1
+        for key in p:
+            if not Vector2(p[key]).is_finite():push_error("Passive cleanup nonfinite")
+            if t>0:max_step=maxf(max_step,Vector2(p[key]).distance_to(combo_clean[t-1][key]))
+        for key in ["hips","chest","head","shoulder_near","shoulder_far","thigh_near","thigh_far"]:
+            if p[key]!=raw[key]:push_error("Passive cleanup changed body anchor")
+        if t>=24 and t<=52:
+            if p.hand_near!=raw.hand_near or p.elbow_near!=raw.elbow_near:push_error("Passive cleanup changed strike arm")
+        if t>=68 and t<=82:
+            if p.foot_near!=raw.foot_near or p.knee_near!=raw.knee_near:push_error("Passive cleanup changed strike leg")
+        for channel in range(4):
+            var side:String="near" if channel%2==0 else "far"
+            var leg:bool=channel>=2
+            var anchor:String=("thigh_" if leg else "shoulder_")+side
+            var joint:String=("knee_" if leg else "elbow_")+side
+            var tip:String=("foot_" if leg else "hand_")+side
+            if leg:floor_error=maxf(floor_error,Vector2(p[tip]).y-430.0)
+            if _passive_weight(t,channel)>.99999:
+                fully_corrected+=1
+                length_error=maxf(length_error,absf(Vector2(p[anchor]).distance_to(p[joint])-(26.0 if leg else 20.0)))
+                length_error=maxf(length_error,absf(Vector2(p[joint]).distance_to(p[tip])-(27.0 if leg else 21.0)))
+    if changed<60 or fully_corrected<100 or length_error>.02 or floor_error>.01 or max_step>45.0:push_error("Passive cleanup continuity / length / floor")
+    print("N 0.10.3h passive: changed ",changed," full chains ",fully_corrected," length error ",length_error," max point step ",max_step," floor error ",floor_error," active tracks unchanged")
