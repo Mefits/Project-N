@@ -1,4 +1,4 @@
-# N — mobility and hand signs / experiment 06.1
+# N — mobility and hand signs / experiment 06.2
 
 M4 accepted as provisional mobility base. Same 60 Hz sandbox, physics constants, coast, camera and jump velocity reset. Main N and Lab unchanged. Open project.godot in Godot 4.4.1 and F5.
 
@@ -11,3 +11,5 @@ M5.2 owner clarification: restore ordinary M3 motor braking (ground 2900, air 13
 M6: H H H confirmed three-hit chain, light damage 9/9, finisher 18. Light contact has no launch impulse, 0.13s attack interval, 0.31s hitstun, 0.27s link window, buffered individual presses (no auto-repeat), third recovery 0.36s and stun 0.40s. Finisher uses normalized direction captured at H press (WASD or independent arrows, horizontal facing toward target if no directional key); contact still checked against the actual target position, launch vector independent of contact side. S+H prioritizes attack, not guard. Ground absorbs downward launch. Miss, block, timeout or damage to player ends chain. CPU has a short periodic frontal melee guard in neutral, disabled in hitstun; no guard against techniques added. Existing debug geometry and seal input unchanged. No attack animation changes; parameters tentative.
 
 M6.1: AI disabled at initial launch (F3 toggles, R preserves selected mode). Starting any melee strike, including miss/block, cancels run and active dash momentum on both axes. No horizontal movement command during melee recovery; jump/dash commands cannot override that recovery. Gravity continues in air. Damage replaces previous motion with the attack's knockback, and ordinary movement input is suppressed in hitstun. Enemy attack also cancels its old motion. No automatic pursuit, body pushbox, or changes to mobility outside melee/hurt; spells retain previous mobility. Combo timing and damage unchanged.
+
+M6.2 correction (supersedes M5.2): owner wants the M4 light inertia, not near-immediate M3 braking and not original strong seal-only coast. Pin the accepted M4 values: no-input ground 660, air 120 px/s²; active acceleration 2900/1350. The motor never branches on Shift; seal input still suppresses movement command. Do not modify these constants without explicit owner direction. M6.1 melee stop and damage reaction remain separate; hitstun uses M6.1 reaction braking, not ordinary coasting. AI remains off by default.

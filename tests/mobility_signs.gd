@@ -96,16 +96,16 @@ func _run() -> void:
 	lab.vel.x = 400
 	key(lab, KEY_SHIFT)
 	lab._step(1.0 / 60.0)
-	check(is_equal_approx(lab.vel.x, 400.0 - 2900.0 / 60.0) and lab.pos.x > 800, "ordinary ground braking during seals")
+	check(is_equal_approx(lab.vel.x, 389.0) and lab.pos.x > 800, "M4 light coast during seals")
 	key(lab, KEY_SHIFT, false)
 	lab.vel.x = 400.0
 	lab._step(1.0 / 60.0)
-	check(is_equal_approx(lab.vel.x, 400.0 - 2900.0 / 60.0), "same ordinary braking without seals")
+	check(is_equal_approx(lab.vel.x, 389.0), "identical M4 light coast without seals")
 	lab.grounded = false
 	lab.pos.y = 400.0
 	lab.vel.x = 400.0
 	lab._move_horizontal(0.0, 1.0 / 60.0)
-	check(is_equal_approx(lab.vel.x, 400.0 - 1350.0 / 60.0), "ordinary air braking")
+	check(is_equal_approx(lab.vel.x, 398.0), "M4 light air coast")
 	lab.vel = Vector2(850, 140)
 	lab.dash_left = 0.1
 	check(lab._try_jump(-1.0), "jump cancels ongoing dash")
@@ -312,5 +312,17 @@ func _run() -> void:
 	check(lab.target == dummy_start and lab.hp == 100, "disabled AI stands still")
 	key(lab, KEY_F3)
 	check(lab.moving_target, "F3 enables AI")
+	lab._reset()
+	lab.vel.x = 420.0
+	for i in range(12):
+		lab._advance_player_motion(0.0, 1.0 / 60.0)
+	check(is_equal_approx(lab.vel.x, 288.0), "accepted M4 ground glide over twelve ticks")
+	lab._reset()
+	lab.grounded = false
+	lab.pos.y = 400.0
+	lab.vel.x = 420.0
+	for i in range(12):
+		lab._advance_player_motion(0.0, 1.0 / 60.0)
+	check(is_equal_approx(lab.vel.x, 396.0), "accepted M4 air glide over twelve ticks")
 	print("Mobility signs smoke: ", failures, " failures")
 	quit(0 if failures == 0 else 1)

@@ -9,6 +9,9 @@ const JUMP := -760.0
 const DASH_SPEED := 850.0
 const MOTOR_GROUND := 2900.0
 const MOTOR_AIR := 1350.0
+# Accepted M4 light inertia, independent of Shift.
+const COAST_GROUND := 660.0
+const COAST_AIR := 120.0
 const READY_TIME := 8.0
 const RECIPES := {"ASD": "Bolt", "ADAD": "Orb", "ASDAS": "Spikes"}
 const MELEE_RANGE := 76.0
@@ -281,8 +284,9 @@ func _physics_process(delta: float) -> void:
 		_step(STEP)
 
 func _move_horizontal(x: float, dt: float) -> void:
-	# Same ordinary M3 motor for acceleration and braking, with or without seals.
-	vel.x = move_toward(vel.x, x * RUN, (MOTOR_GROUND if grounded else MOTOR_AIR) * dt)
+	# One light inertia profile for all locomotion, with or without seals.
+	var rate := (COAST_GROUND if grounded else COAST_AIR) if is_zero_approx(x) else (MOTOR_GROUND if grounded else MOTOR_AIR)
+	vel.x = move_toward(vel.x, x * RUN, rate * dt)
 
 func _movement_locked() -> bool:
 	return melee_left > 0.00001 or hurt > 0.0
@@ -300,7 +304,13 @@ func _advance_player_motion(move_x: float, dt: float) -> void:
 			vel *= 0.42
 	else:
 		# Hitstun keeps only the reaction impulse, never the held movement command.
-		_move_horizontal(0.0 if _movement_locked() else move_x, dt)
+		if hurt > 0.0:
+			# Keep the M6.1 knockback reaction distinct from ordinary inertia.
+			vel.x = move_toward(vel.x, 0.0, (MOTOR_GROUND if grounded else MOTOR_AIR) * dt)
+		elif _movement_locked():
+			vel.x = 0.0
+		else:
+			_move_horizontal(move_x, dt)
 		if not grounded:
 			vel.y += GRAVITY * dt
 		elif vel.y > 0:
@@ -671,7 +681,7 @@ func _draw() -> void:
 		draw_rect(Rect2(bar, Vector2(84.0 * ready_left / READY_TIME, 5)), GOLD)
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
-	_label(Vector2(16, 24), "N / M6.1 three-hit combo", 20, BLUE)
+	_label(Vector2(16, 24), "N / M6.2 three-hit combo", 20, BLUE)
 	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout], 14)
 	_label(Vector2(16, 69), "H H H combo   S guard   ESC cancel   F1 hitboxes   F3 AI   F4 layout   R reset", 14)
 	_label(Vector2(dims.x - 255, 24), ("BOX ON" if show_hitboxes else "BOX OFF") + " / " + ("AI ON" if moving_target else "AI OFF"), 15, GOLD)
