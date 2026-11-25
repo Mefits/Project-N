@@ -5,6 +5,11 @@ var model=MODEL.new()
 var full_body:Array[Dictionary]=[]
 var impact_clock:Array[int]=[]
 var spatial:Array[Dictionary]=[]
+const REF_REC=preload("res://lab/recording.gd")
+const REF_RIG=preload("res://game/rig.gd")
+var ref_record=REF_REC.new()
+var ref_frames:Array[Dictionary]=[]
+var ref_contact:int=-1
 const OLD_SKIN=preload("res://game/fighter_skin.gd")
 const EXTRA_HOLD=[0,2,4,6] # additional 120 Hz ticks; only in replay C
 var tick:float=0
@@ -14,7 +19,7 @@ var bones:bool=false
 var slider:HSlider
 var info:Label
 func _ready()->void:
-    _build_study()
+    _build_reference()
     var bar:=HBoxContainer.new()
     bar.position=Vector2(12,8)
     add_child(bar)
@@ -45,8 +50,8 @@ func _button(bar:HBoxContainer,txt:String,cb:Callable)->void:
 func seek(t:float)->void:
     tick=clampf(t,0,220)
     slider.set_value_no_signal(tick)
-    var f:Dictionary=model.record.frames[int(tick)]
-    info.text="N 0.10.3d  ·  %03d / 220  ·  %.0f мс  ·  %s  ·  %d/4  ·  %.1f×"%[int(tick),tick*1000/120,f.a.kind,f.hits,speed]
+    var f:Dictionary=ref_record.frames[mini(int(tick),ref_record.frames.size()-1)]
+    info.text="N 0.10.3e  ·  %03d / 220  ·  %.0f мс  ·  %s  ·  %d/1  ·  %.1f×"%[int(tick),tick*1000/120,f.a.kind,f.hits,speed]
     queue_redraw()
 func _process(dt:float)->void:
     if playing:seek(fposmod(tick+120*dt*speed,221))
@@ -58,26 +63,23 @@ func _skeleton(p:Dictionary,c:Color)->void:
     for k in p:draw_circle(p[k],2.5,c)
 func _draw()->void:
     draw_rect(Rect2(0,0,960,540),Color("#172632"))
-    var names:Array=["A  ·  0.10.3c / 2D","B  ·  3D-скелет / проекция","C  ·  3D + усиленный hitstop"]
+    var names:Array=["A  ·  Игровой джеб","B  ·  Позы Какаши / перенос","C  ·  Позы + опора и контакт"]
     for variant in range(3):
         var y:float=66+157*variant
         var floor_y:float=y+143
         draw_rect(Rect2(10,y,940,149),Color("#213542"))
         draw_string(ThemeDB.fallback_font,Vector2(22,y+24),names[variant],HORIZONTAL_ALIGNMENT_LEFT,-1,15,Color("#e2e7eb"))
         draw_line(Vector2(12,floor_y),Vector2(948,floor_y),Color("#82968e"),1)
-        var source_tick:int=impact_clock[int(tick)] if variant==2 else int(tick)
-        var sample_frame:Dictionary=model.record.frames[source_tick]
-        var p:Dictionary=full_body[source_tick] if variant==0 else spatial[source_tick]
+        var source_tick:int=mini(int(tick),ref_frames.size()-1)
+        var sample_frame:Dictionary=ref_record.frames[source_tick]
+        var p:Dictionary=ref_frames[source_tick][variant]
         draw_set_transform(Vector2(10,floor_y-430),0,Vector2.ONE)
         if bones:
             _skeleton(p.a,Color("#6daac8"))
             _skeleton(p.b,Color("#c88b72"))
-        elif variant==0:
+        else:
             SKIN.draw(self,p.a,int(sample_frame.a.face),Color("#6daac8"))
             SKIN.draw(self,p.b,int(sample_frame.b.face),Color("#c88b72"))
-        else:
-            _depth_skin(p.a,p.za,int(sample_frame.a.face),Color("#6daac8"))
-            _depth_skin(p.b,p.zb,int(sample_frame.b.face),Color("#c88b72"))
         draw_set_transform(Vector2.ZERO)
 
 # 0.10.3c original authored hypothesis. Same world, positions, hits and support.
@@ -292,3 +294,117 @@ func _depth_skin(p:Dictionary,z:Dictionary,face:int,accent:Color)->void:
             "leg":SKIN.leg(self,p,layer.side,face,accent,shade)
             "body":SKIN.body(self,p,face,accent)
             "head":OLD_SKIN.head(self,p,face,accent)
+
+# 0.10.3e reference-only study. User supplied archive "2d anim ref.zip",
+# NARUTO REF/54589.png, Kakashi, Naruto Shinobi Rumble (DS), sheet credit Floaj.
+# Source crop in ORIGINAL pixels (0,810)-(490,910); first three cells;
+# points below are visually estimated in the 3x enlarged crop. Fourth
+# airborne pose is NOT part of this grounded test. No source pixels shipped.
+# Source playback FPS unknown. Proposed N ages: 0 entry, 3 crouch, 6 load,
+# actual recorded contact = extension, hold through actual hitstop, then recover.
+const REF_NAMES=["hips","chest","head","shoulder_near","elbow_near","hand_near","shoulder_far","elbow_far","hand_far","thigh_near","knee_near","foot_near","thigh_far","knee_far","foot_far"]
+const REF_RAW=[
+    [Vector2(168,216),Vector2(166,175),Vector2(176,144),Vector2(146,177),Vector2(147,208),Vector2(159,253),Vector2(185,175),Vector2(190,200),Vector2(166,216),Vector2(175,218),Vector2(214,237),Vector2(211,278),Vector2(155,218),Vector2(106,238),Vector2(94,278)],
+    [Vector2(545,216),Vector2(547,167),Vector2(565,132),Vector2(521,164),Vector2(518,198),Vector2(522,234),Vector2(563,163),Vector2(572,190),Vector2(541,192),Vector2(552,218),Vector2(581,238),Vector2(566,278),Vector2(533,218),Vector2(479,243),Vector2(450,278)],
+    [Vector2(925,209),Vector2(962,171),Vector2(998,145),Vector2(979,168),Vector2(1030,168),Vector2(1082,168),Vector2(946,173),Vector2(915,178),Vector2(933,195),Vector2(938,214),Vector2(971,239),Vector2(951,276),Vector2(915,216),Vector2(867,243),Vector2(819,270)]
+]
+func _reference_key(k:int,f:Dictionary)->Dictionary:
+    var raw:Array=REF_RAW[k]
+    var origin:Vector2=Vector2((Vector2(raw[11]).x+Vector2(raw[14]).x)*.5,280.0)
+    var p:Dictionary={}
+    for n in range(REF_NAMES.size()):
+        var v:Vector2=(Vector2(raw[n])-origin)*.65
+        p[REF_NAMES[n]]=Vector2(f.pos)+Vector2(v.x*float(f.face),v.y)
+    return p
+
+func _mix_reference(a:Dictionary,b:Dictionary,u:float)->Dictionary:
+    var p:Dictionary={}
+    for k in a:p[k]=Vector2(a[k]).lerp(b[k],u)
+    return p
+
+func _reference_pose(f:Dictionary,contact_age:int)->Dictionary:
+    var base:Dictionary=f.points
+    if f.kind!="jab" or f.age<0:return base.duplicate(true)
+    var a:float=float(f.age)
+    var p0:Dictionary=_reference_key(0,f)
+    var p1:Dictionary=_reference_key(1,f)
+    var p2:Dictionary=_reference_key(2,f)
+    var ca:float=float(contact_age)
+    if a<=3.0:return _mix_reference(base,p0,smoothstep(0.0,3.0,a))
+    if a<=6.0:return _mix_reference(p0,p1,smoothstep(3.0,6.0,a))
+    if a<=ca:return _mix_reference(p1,p2,pow(clampf((a-6.0)/maxf(1.0,ca-6.0),0.0,1.0),2.0))
+    return _mix_reference(p2,base,smoothstep(ca,ca+14.0,a))
+
+func _adapt_reference(raw:Dictionary,f:Dictionary,i:int)->Dictionary:
+    var base:Dictionary=f.points
+    if f.kind!="jab" or f.age<0:return base.duplicate(true)
+    var p:Dictionary=raw.duplicate(true)
+    # Fit the raw silhouette to the true root and contact geometry, without
+    # replacing it with the old pose. The exact planted feet are immutable.
+    var face:float=float(f.face)
+    var source_hand:Vector2=p[f.strike]
+    var baseline_hand:Vector2=base[f.strike]
+    var approach:float=1.0-smoothstep(0.0,4.0,absf(float(i-ref_contact)))
+    var correction:Vector2=(baseline_hand-source_hand)*approach
+    var hip_offset:Vector2=correction.limit_length(24.0)*.60
+    for k in ["hips","chest","head","shoulder_near","shoulder_far","elbow_near","elbow_far","hand_near","hand_far","thigh_near","thigh_far"]:
+        p[k]=Vector2(p[k])+hip_offset
+    p[f.strike]=source_hand.lerp(baseline_hand,approach)
+    # Retain the source knee/elbow direction, solve length using the actual
+    # end target. 2D length may shorten through apparent depth.
+    for j in range(2):
+        var side:String="near" if j==0 else "far"
+        var foot:String="foot_"+side
+        var thigh:String="thigh_"+side
+        var knee:String="knee_"+side
+        if f.support[j]:p[foot]=base[foot]
+        var d:Vector2=Vector2(p[foot])-Vector2(p[thigh])
+        var bend:float=1.0 if d.cross(Vector2(p[knee])-Vector2(p[thigh]))>=0.0 else -1.0
+        var leg:Array[Vector2]=REF_RIG.chain(p[thigh],p[foot],30.0,30.0,bend)
+        p[knee]=leg[0]
+        var sh:String="shoulder_"+side
+        var el:String="elbow_"+side
+        var hand:String="hand_"+side
+        var arm_d:Vector2=Vector2(p[hand])-Vector2(p[sh])
+        var arm_bend:float=1.0 if arm_d.cross(Vector2(p[el])-Vector2(p[sh]))>=0.0 else -1.0
+        var arm:Array[Vector2]=REF_RIG.chain(p[sh],p[hand],22.0,23.0,arm_bend)
+        p[el]=arm[0]
+        if hand!=f.strike or i!=ref_contact:p[hand]=arm[1]
+    # At the actual impact the exact endpoint remains non-negotiable.
+    if i==ref_contact:p[f.strike]=base[f.strike]
+    return p
+
+func _build_reference()->void:
+    ref_record.record("jab")
+    var ca:int=10
+    var hits:int=0
+    for i in range(ref_record.frames.size()):
+        if ref_record.frames[i].contact_event:
+            ref_contact=i
+            ca=int(ref_record.frames[i].a.age)
+            hits+=1
+    if hits!=1:push_error("Reference study expected one actual jab contact")
+    var max_support:float=0.0
+    var max_error:float=0.0
+    var changed:int=0
+    for i in range(ref_record.frames.size()):
+        var frame:Dictionary=ref_record.frames[i]
+        var f:Dictionary=frame.a
+        var raw:Dictionary=_reference_pose(f,ca)
+        var fitted:Dictionary=_adapt_reference(raw,f,i)
+        if frame.frozen and i>0:
+            raw=ref_frames[-1][1].a.duplicate(true)
+            fitted=ref_frames[-1][2].a.duplicate(true)
+        if not frame.frozen:
+            for j in range(2):
+                var side:String="near" if j==0 else "far"
+                if f.support[j]:
+                    max_support=maxf(max_support,Vector2(fitted["foot_"+side]).distance_to(f.points["foot_"+side]))
+        for p in [raw,fitted]:
+            for k in p:
+                if not Vector2(p[k]).is_finite():push_error("Reference nonfinite joint")
+        if frame.contact_event:max_error=Vector2(fitted[f.strike]).distance_to(f.points[f.strike])
+        if fitted!=f.points:changed+=1
+        ref_frames.append({0:{"a":f.points,"b":frame.b.points},1:{"a":raw,"b":frame.b.points},2:{"a":fitted,"b":frame.b.points}})
+    if max_support>.001 or max_error>.001 or changed<10:push_error("Reference retarget constraint failure")
+    print("N 0.10.3e reference: contact ",ref_contact," age ",ca," changed ",changed," support error ",max_support," contact error ",max_error)
