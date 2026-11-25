@@ -206,5 +206,62 @@ func _run() -> void:
 	check(not lab.show_hitboxes, "F1 hides hitboxes")
 	key(lab, KEY_F1)
 	check(lab.show_hitboxes, "F1 shows hitboxes")
+	# Buffered light-light-finisher with actual simulated ticks and CPU defense.
+	lab._reset()
+	lab.moving_target = true
+	lab.clock = 1.40
+	lab.target = lab._center() + Vector2(60, 0)
+	lab.enemy_grounded = true
+	lab.enemy_attack_left = 0.0
+	key(lab, KEY_H)
+	lab._step(1.0 / 60.0)
+	check(lab.combo_stage == 1 and lab.enemy_hp == 91 and lab.enemy_hurt > 0.28, "first light hit confirms")
+	lab._queue_melee(Vector2.RIGHT)
+	lab._queue_melee(Vector2.UP)
+	for i in range(8):
+		lab._step(1.0 / 60.0)
+	check(lab.combo_stage == 2 and lab.enemy_hp == 82 and lab.enemy_hurt > 0.27, "second light inside first stun")
+	check(not lab.enemy_guarding, "CPU cannot guard between light hits")
+	for i in range(8):
+		lab._step(1.0 / 60.0)
+	check(lab.combo_stage == 0 and lab.enemy_hp == 64 and lab.enemy_vel.y < -600.0, "buffered upward finisher launches")
+	check(lab.melee_left > 0.30 and lab.melee_queue.is_empty(), "finisher ends chain and recovers")
+	lab._queue_melee(Vector2.RIGHT)
+	check(lab.melee_queue.is_empty(), "no fourth hit during recovery")
+	for direction in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN, Vector2(1,-1).normalized()]:
+		lab._reset()
+		lab.moving_target = false
+		lab.target = lab._center() + Vector2(50, 0)
+		lab._melee()
+		lab._melee()
+		lab._melee(direction)
+		check(lab.enemy_hp == 64 and lab.enemy_vel.is_equal_approx(direction * 680.0), "finisher independent launch vector " + str(direction))
+	lab._reset()
+	lab.moving_target = false
+	lab.target = lab._center() + Vector2(110,0)
+	lab._queue_melee(Vector2.RIGHT)
+	lab._queue_melee(Vector2.RIGHT)
+	lab._step(1.0 / 60.0)
+	check(lab.enemy_hp == 100 and lab.combo_stage == 0 and lab.melee_queue.is_empty(), "miss ends buffered chain")
+	lab._reset()
+	lab.moving_target = true
+	lab.clock = 1.8
+	lab.target = lab._center() + Vector2(50,0)
+	lab._queue_melee(Vector2.RIGHT)
+	lab._step(1.0 / 60.0)
+	check(lab.enemy_guarding and lab.enemy_hp == 100 and lab.combo_stage == 0, "CPU neutral guard blocks opener")
+	lab._reset()
+	lab.moving_target = false
+	lab.target = lab._center() + Vector2(50,0)
+	lab._melee()
+	for i in range(18):
+		lab._step(1.0 / 60.0)
+	check(lab.combo_stage == 0, "late follow-up resets combo")
+	lab._reset()
+	lab.target = lab._center() + Vector2(50,0)
+	lab._melee()
+	lab._queue_melee(Vector2.RIGHT)
+	lab._hit_player(8, Vector2.ZERO, lab.target)
+	check(lab.combo_stage == 0 and lab.melee_queue.is_empty(), "player hit interrupts melee chain only")
 	print("Mobility signs smoke: ", failures, " failures")
 	quit(0 if failures == 0 else 1)

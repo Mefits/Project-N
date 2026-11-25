@@ -1,4 +1,4 @@
-# N — mobility and hand signs / experiment 05.2
+# N — mobility and hand signs / experiment 06
 
 M4 accepted as provisional mobility base. Same 60 Hz sandbox, physics constants, coast, camera and jump velocity reset. Main N and Lab unchanged. Open project.godot in Godot 4.4.1 and F5.
 
@@ -7,3 +7,5 @@ A/D move; WASD selects aim outside signs; arrows override. Shift + ASD (release 
 M5.1: S alone guards, Shift+S is seal input, S+J/K takes action priority and selects down aim. Standing guard does not itself aim down. Down dash on ground remains horizontal, follows facing if no horizontal input. F1 toggles hitbox debug (default on): red outlines/fills indicate damage geometry, yellow outlines telegraph pending CPU strike or spikes, green target circle is projectile hurt region and green dots are tested centers. Melee is instantaneous, debug zone retained 0.13s for readability (not additional active frames). Spikes display the same grown rectangle used for collision. No changes to attack damage, movement tuning or animation.
 
 M5.2 owner clarification: restore ordinary M3 motor braking (ground 2900, air 1350 px/s²) for all input states, including Shift. Remove special seal coasting rates entirely. Shift still routes WASD to seal input, so no movement command is supplied during signs. Preserve jump reset, dash speed, camera, combat and recipes. User considers current direction promising, not final balance approval.
+
+M6: H H H confirmed three-hit chain, light damage 9/9, finisher 18. Light contact has no launch impulse, 0.13s attack interval, 0.31s hitstun, 0.27s link window, buffered individual presses (no auto-repeat), third recovery 0.36s and stun 0.40s. Finisher uses normalized direction captured at H press (WASD or independent arrows, horizontal facing toward target if no directional key); contact still checked against the actual target position, launch vector independent of contact side. S+H prioritizes attack, not guard. Ground absorbs downward launch. Miss, block, timeout or damage to player ends chain. CPU has a short periodic frontal melee guard in neutral, disabled in hitstun; no guard against techniques added. Existing debug geometry and seal input unchanged. No attack animation changes; parameters tentative.

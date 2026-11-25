@@ -12,6 +12,12 @@ const MOTOR_AIR := 1350.0
 const READY_TIME := 8.0
 const RECIPES := {"ASD": "Bolt", "ADAD": "Orb", "ASDAS": "Spikes"}
 const MELEE_RANGE := 76.0
+const LIGHT_GAP := 0.13
+const LIGHT_STUN := 0.31
+const LINK_WINDOW := 0.27
+const FINISH_RECOVERY := 0.36
+const FINISH_STUN := 0.40
+const FINISH_SPEED := 680.0
 const SPIKE_HEIGHT := 108.0
 const SPIKE_WIDTH := 190.0
 const MAX_HP := 100
@@ -47,6 +53,10 @@ var enemy_cooldown := 0.0
 var enemy_facing := -1.0
 var facing := 1.0
 var attack_requested := false
+var melee_queue: Array[Vector2] = []
+var combo_stage := 0
+var combo_window := 0.0
+var enemy_guarding := false
 var guarding := false
 var melee_facing := 1.0
 var spikes: Array[Dictionary] = []
@@ -111,6 +121,31 @@ func _update_aim(down_as_aim: bool = true) -> void:
 	var arrows := Vector2(float(int(Input.is_physical_key_pressed(KEY_RIGHT)) - int(Input.is_physical_key_pressed(KEY_LEFT))), float(int(Input.is_physical_key_pressed(KEY_DOWN)) - int(Input.is_physical_key_pressed(KEY_UP))))
 	_aim_from_keys(move, arrows)
 
+func _held_attack_direction() -> Vector2:
+	var arrows := Vector2(float(int(Input.is_physical_key_pressed(KEY_RIGHT)) - int(Input.is_physical_key_pressed(KEY_LEFT))), float(int(Input.is_physical_key_pressed(KEY_DOWN)) - int(Input.is_physical_key_pressed(KEY_UP))))
+	var move := Vector2(_axis(), float(int(Input.is_physical_key_pressed(KEY_S)) - int(Input.is_physical_key_pressed(KEY_W))))
+	if arrows.length_squared() > 0.0:
+		return arrows.normalized()
+	if not signing and move.length_squared() > 0.0:
+		return move.normalized()
+	return Vector2.ZERO
+
+func _queue_melee(direction: Vector2) -> void:
+	if hurt > 0.0 or hp <= 0 or enemy_hp <= 0:
+		return
+	if combo_stage == 0 and melee_left > 0.0:
+		return
+	if melee_queue.size() >= 3 - combo_stage:
+		return
+	melee_queue.append(direction.normalized())
+	attack_requested = true
+
+func _clear_combo() -> void:
+	combo_stage = 0
+	combo_window = 0.0
+	melee_queue.clear()
+	attack_requested = false
+
 func _space_press() -> void:
 	if layout == 1 and clock - last_space <= DOUBLE_TAP:
 		dash_requested = true
@@ -156,11 +191,12 @@ func _input(event: InputEvent) -> void:
 				if signing and not sign_done and RECIPES.has(sequence):
 					_prepare(String(RECIPES[sequence]))
 				cast_requested = true
-			KEY_H: attack_requested = true
+			KEY_H: _queue_melee(_held_attack_direction())
 			KEY_F3:
 				moving_target = not moving_target
 				enemy_vel = Vector2.ZERO
 				enemy_attack_left = 0.0
+				enemy_guarding = false
 			KEY_F1:
 				show_hitboxes = not show_hitboxes
 			KEY_F4:
@@ -210,7 +246,8 @@ func _reset() -> void:
 	enemy_facing = -1.0
 	facing = 1.0
 	guarding = false
-	attack_requested = false
+	enemy_guarding = false
+	_clear_combo()
 	blocks = 0
 	hits = 0
 	casts = 0
@@ -229,6 +266,7 @@ func _notification(what: int) -> void:
 		jump_requested = false
 		dash_requested = false
 		cast_requested = false
+		_clear_combo()
 
 func _center() -> Vector2:
 	return pos - Vector2(0, 28)
@@ -259,7 +297,7 @@ func _try_jump(x: float) -> bool:
 
 func _guard_intent(s_down: bool) -> bool:
 	# S is guard except when it belongs to a seal or a directional action.
-	return s_down and not signing and not dash_requested and not cast_requested and hurt <= 0.0 and melee_left <= 0.0 and dash_left <= 0.0
+	return s_down and not signing and not dash_requested and not cast_requested and not attack_requested and hurt <= 0.0 and melee_left <= 0.0 and dash_left <= 0.0
 
 func _melee_contains(origin: Vector2, direction: float, radius: float, point: Vector2) -> bool:
 	var delta := point - origin
@@ -284,6 +322,10 @@ func _step(dt: float) -> void:
 	hurt = maxf(0.0, hurt - dt)
 	enemy_hurt = maxf(0.0, enemy_hurt - dt)
 	melee_left = maxf(0.0, melee_left - dt)
+	if combo_stage > 0:
+		combo_window = maxf(0.0, combo_window - dt)
+		if combo_window <= 0.0:
+			_clear_combo()
 	message_left = maxf(0.0, message_left - dt)
 	dash_cooldown = maxf(0.0, dash_cooldown - dt)
 	if not prepared_spell.is_empty():
@@ -293,15 +335,16 @@ func _step(dt: float) -> void:
 			_notice("Technique expired")
 	var s_down := Input.is_physical_key_pressed(KEY_S)
 	# Holding S alone cannot redirect aim down; S+J/K can.
-	_update_aim(not s_down or (not signing and (dash_requested or cast_requested)))
+	_update_aim(not s_down or (not signing and (dash_requested or cast_requested or attack_requested)))
 	if absf(aim.x) > 0.05:
 		facing = signf(aim.x)
 	guarding = _guard_intent(s_down)
 	var move_x := 0.0 if signing or guarding or hurt > 0.0 else _axis()
-	if attack_requested:
-		if not guarding and hurt <= 0.0 and melee_left <= 0.0:
-			_melee()
-		attack_requested = false
+	_refresh_enemy_guard()
+	if attack_requested and not melee_queue.is_empty() and not guarding and hurt <= 0.0 and melee_left <= 0.00001:
+		var strike_dir: Vector2 = melee_queue.pop_front()
+		attack_requested = not melee_queue.is_empty()
+		_melee(strike_dir)
 	if jump_requested:
 		if hurt <= 0.0 and not guarding:
 			_try_jump(move_x)
@@ -364,20 +407,54 @@ func _step(dt: float) -> void:
 	camera = camera.lerp(focus, minf(dt * 6.0, 1.0))
 	queue_redraw()
 
-func _melee() -> void:
-	melee_left = 0.32
-	melee_facing = facing
-	_remember_strike(_center(), melee_facing, MELEE_RANGE)
-	if _melee_contains(_center(), melee_facing, MELEE_RANGE, target):
-		_hit_enemy(9, Vector2(melee_facing * 300.0, -155.0))
-	else:
-		_notice("Melee miss")
+func _refresh_enemy_guard() -> void:
+	# Short predictable defensive openings for the sparring AI, never during hitstun.
+	enemy_guarding = moving_target and enemy_hurt <= 0.00001 and enemy_attack_left <= 0.0 and _center().distance_to(target) <= 105.0 and fposmod(clock, 2.2) >= 1.65
+	if enemy_guarding and absf(pos.x - target.x) > 0.05:
+		enemy_facing = signf(pos.x - target.x)
 
-func _hit_enemy(damage: int, impulse: Vector2) -> void:
+func _enemy_blocks(source: Vector2) -> bool:
+	return enemy_guarding and enemy_hurt <= 0.00001 and (source.x - target.x) * enemy_facing >= -3.0
+
+func _melee(direction: Vector2 = Vector2.ZERO) -> void:
+	var next_hit := combo_stage + 1
+	melee_facing = facing
+	# Link contact still requires physical range; the finisher's launch vector
+	# is independent of the side where the already staggered opponent stands.
+	if combo_stage > 0 and absf(target.x - pos.x) > 0.05:
+		melee_facing = signf(target.x - pos.x)
+	_remember_strike(_center(), melee_facing, MELEE_RANGE)
+	if not _melee_contains(_center(), melee_facing, MELEE_RANGE, target):
+		melee_left = FINISH_RECOVERY
+		_clear_combo()
+		_notice("Melee miss - chain ended")
+		return
+	if _enemy_blocks(_center()):
+		melee_left = FINISH_RECOVERY
+		_clear_combo()
+		_notice("CPU blocked - chain ended")
+		return
+	if next_hit < 3:
+		var was_grounded := enemy_grounded
+		_hit_enemy(9, Vector2.ZERO, LIGHT_STUN)
+		enemy_grounded = was_grounded
+		combo_stage = next_hit
+		combo_window = LINK_WINDOW
+		melee_left = LIGHT_GAP
+		_notice("Combo %d/3" % next_hit)
+	else:
+		var launch := direction.normalized() if direction.length_squared() > 0.0 else Vector2(melee_facing, 0)
+		_hit_enemy(18, launch * FINISH_SPEED, FINISH_STUN)
+		melee_left = FINISH_RECOVERY
+		_clear_combo()
+		_notice("Combo 3/3 - finisher")
+
+func _hit_enemy(damage: int, impulse: Vector2, stun: float = 0.24) -> void:
 	if enemy_hp <= 0:
 		return
 	enemy_hp = maxi(0, enemy_hp - damage)
-	enemy_hurt = 0.24
+	enemy_hurt = stun
+	enemy_guarding = false
 	enemy_vel = impulse
 	enemy_grounded = false
 	enemy_attack_left = 0.0
@@ -398,6 +475,7 @@ func _hit_player(damage: int, impulse: Vector2, source: Vector2) -> void:
 	hurt = 0.23
 	dash_left = 0.0
 	melee_left = 0.0
+	_clear_combo()
 	vel = impulse
 	grounded = false
 	# Do not modify signing, sequence, prepared_spell or ready_left.
@@ -414,7 +492,9 @@ func _update_enemy(dt: float) -> void:
 			if _melee_contains(target, enemy_facing, MELEE_RANGE + 8.0, _center()):
 				_hit_player(8, Vector2(enemy_facing * 330.0, -120.0), target)
 	if enemy_hurt <= 0.0:
-		if moving_target and enemy_attack_left <= 0.0:
+		if enemy_guarding:
+			enemy_vel.x = move_toward(enemy_vel.x, 0.0, 1700.0 * dt)
+		elif moving_target and enemy_attack_left <= 0.0:
 			if absf(delta.x) > 4.0:
 				enemy_facing = signf(delta.x)
 			if delta.length() <= MELEE_RANGE and enemy_cooldown <= 0.0:
@@ -527,7 +607,9 @@ func _draw() -> void:
 	_fighter(target + Vector2(0, 30), RED.lightened(0.4) if enemy_hurt > 0 else RED, enemy_facing)
 	if guarding:
 		draw_arc(_center(), 34.0, -1.3 if facing > 0 else 1.84, 1.3 if facing > 0 else 4.44, 22, BLUE, 4.0, true)
-	if melee_left > 0.20:
+	if enemy_guarding:
+		draw_arc(target, 34.0, -1.3 if enemy_facing > 0 else 1.84, 1.3 if enemy_facing > 0 else 4.44, 22, RED, 4.0, true)
+	if (combo_stage > 0 and melee_left > 0.045) or melee_left > 0.24:
 		draw_line(_center(), _center() + Vector2(melee_facing * MELEE_RANGE, 0), BLUE, 6.0, true)
 	if enemy_attack_left > 0.0:
 		draw_arc(target, 32.0, 0.0, TAU, 24, GOLD if enemy_attack_left > 0.12 else RED, 3.0, true)
@@ -576,9 +658,9 @@ func _draw() -> void:
 		draw_rect(Rect2(bar, Vector2(84.0 * ready_left / READY_TIME, 5)), GOLD)
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
-	_label(Vector2(16, 24), "N / M5.2 combat + seals", 20, BLUE)
+	_label(Vector2(16, 24), "N / M6 three-hit combo", 20, BLUE)
 	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout], 14)
-	_label(Vector2(16, 69), "H melee   S guard   ESC cancel   F1 hitboxes   F3 AI   F4 layout   R reset", 14)
+	_label(Vector2(16, 69), "H H H combo   S guard   ESC cancel   F1 hitboxes   F3 AI   F4 layout   R reset", 14)
 	_label(Vector2(dims.x - 255, 24), ("BOX ON" if show_hitboxes else "BOX OFF") + " / " + ("AI ON" if moving_target else "AI OFF"), 15, GOLD)
 	var hp_width := 140.0
 	_label(Vector2(16, 86), "P1 %d" % hp, 12, BLUE)
@@ -592,7 +674,7 @@ func _draw() -> void:
 	var bottom := dims.y - 86.0
 	draw_rect(Rect2(0, bottom, dims.x, 86), Color("#111a27"))
 	_label(Vector2(16, bottom + 21), "BOLT: A S D     FIREBALL: A D A D     SPIKES: A S D A S", 16, GOLD)
-	_label(Vector2(16, bottom + 44), "Air dashes: %d/2    Double jump: %s    Casts: %d    Hits: %d" % [air_dashes, "ready" if air_jump else "used", casts, hits], 14)
+	_label(Vector2(16, bottom + 44), "Air dashes: %d/2    Double jump: %s    Combo: %d/3    Hits: %d" % [air_dashes, "ready" if air_jump else "used", combo_stage, hits], 14)
 	var status := ("Signs: " + sequence) if signing else "Move freely"
 	if layout == 1 and not signing and prepared_spell.is_empty():
 		status = "Quick double SPACE: dash / later SPACE: double jump"
