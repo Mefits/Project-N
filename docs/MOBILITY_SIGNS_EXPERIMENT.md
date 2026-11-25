@@ -1,7 +1,7 @@
-# N — mobility and hand signs / experiment 03
+# N — mobility and hand signs / experiment 04
 
-Open project.godot in Godot 4.4.1, press F5. This branch's default scene is the isolated 60 Hz control sandbox, not the main arena. All physics constants, camera, techniques and target motion are retained from M2. No mouse input.
+Open project.godot in Godot 4.4.1, press F5. Isolated sandbox at 60 Hz. N main arena and Lab unchanged.
 
-A/D move; WASD outside signing sets one of eight aim directions, retained when released. Arrow keys optionally override aim, including during signs. Shift + WASD prepares WDS (Bolt), SWDW (Orb), ADW (Rush). Release Shift, J casts toward aim, K dashes, Space jumps/double jumps, L or Escape cancels. F4 enables optional double-Space dash (second press within 260 ms), K remains available. F2 toggles coast (default) vs latched movement; F3 toggles target; R reset. Signs do not change aim while held; independent arrows remain available. 8-second preparation lifetime, no real opponent attacks. Controls and timing are experimental; no new animations or changes to main or Lab.
+M4 owner feedback: halve dash speed (1700 to 850 px/s), retain duration 0.18s and cooldown. Use inertia continuously with no horizontal movement command, including during signs; double the previous seal coasting deceleration (ground 330 to 660, air 60 to 120). This halves stopping time and distance at equal initial speed in the continuous model. Active movement acceleration, max run speed and gravity unchanged. Jump/double jump replaces velocity with current horizontal movement direction times RUN (zero without input or while signing) and original upward impulse; cancels ongoing dash but does not refund air dash charges. No unlimited jumps.
 
-Test keyboard-only mobility, directional attacks and simultaneous movement/seals. Especially compare K against double Space and whether aiming with WASD or arrows feels more natural.
+A/D move; WASD selects aim outside signing, arrows override aim. Shift + ASD prepares Bolt; Shift + ADAD prepares Orb. Removed Rush and the free dash code. J cast, K dash, Space jump/double jump, L/Escape cancel. F4 toggles optional quick double-Space dash (260ms). F3 target, R reset. Removed F2 latch mode. Readiness remains 8 seconds. All balance values provisional.

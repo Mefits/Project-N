@@ -6,9 +6,11 @@ const FLOOR := 790.0
 const RUN := 420.0
 const GRAVITY := 1250.0
 const JUMP := -760.0
-const DASH_SPEED := 1700.0
+const DASH_SPEED := 850.0
+const COAST_GROUND := 660.0
+const COAST_AIR := 120.0
 const READY_TIME := 8.0
-const RECIPES := {"WDS": "Bolt", "SWDW": "Orb", "ADW": "Rush"}
+const RECIPES := {"ASD": "Bolt", "ADAD": "Orb"}
 const BLUE := Color("#83baf2")
 const GOLD := Color("#efc276")
 const RED := Color("#ec8879")
@@ -28,13 +30,11 @@ var sign_done := false
 var sequence := ""
 var prepared_spell := ""
 var ready_left := 0.0
-var latched := 0.0
-var latch_mode := false
 var moving_target := true
 var shots: Array[Dictionary] = []
 var hits := 0
 var casts := 0
-var message := "Try W D S while holding SHIFT"
+var message := "Try A S D while holding SHIFT"
 var message_left := 4.0
 var camera := Vector2(1030, 590)
 var zoom := 0.8
@@ -56,7 +56,6 @@ func _axis() -> float:
 
 func _seal_modifier(down: bool) -> void:
 	if down and not signing:
-		latched = _axis()
 		signing = true
 		sign_done = false
 		sequence = ""
@@ -122,9 +121,6 @@ func _input(event: InputEvent) -> void:
 			KEY_K: dash_requested = true
 			KEY_J: cast_requested = true
 			KEY_L: _cancel()
-			KEY_F2:
-				latch_mode = not latch_mode
-				_notice("Latched movement" if latch_mode else "Coast on inertia")
 			KEY_F3:
 				moving_target = not moving_target
 			KEY_F4:
@@ -189,6 +185,24 @@ func _physics_process(delta: float) -> void:
 		accumulator -= STEP
 		_step(STEP)
 
+func _move_horizontal(x: float, dt: float) -> void:
+	# Coast all the time with no movement input, including during seals.
+	if is_zero_approx(x):
+		vel.x = move_toward(vel.x, 0.0, (COAST_GROUND if grounded else COAST_AIR) * dt)
+	else:
+		vel.x = move_toward(vel.x, x * RUN, (2900.0 if grounded else 1350.0) * dt)
+
+func _try_jump(x: float) -> bool:
+	if not grounded and not air_jump:
+		return false
+	if not grounded:
+		air_jump = false
+	grounded = false
+	# A new jump discards the previous velocity, including any ongoing dash.
+	dash_left = 0.0
+	vel = Vector2(x * RUN, JUMP)
+	return true
+
 func _step(dt: float) -> void:
 	clock += dt
 	message_left = maxf(0.0, message_left - dt)
@@ -199,12 +213,9 @@ func _step(dt: float) -> void:
 			prepared_spell = ""
 			_notice("Technique expired")
 	_update_aim()
+	var move_x := 0.0 if signing else _axis()
 	if jump_requested:
-		if dash_left <= 0.0 and (grounded or air_jump):
-			if not grounded:
-				air_jump = false
-			grounded = false
-			vel.y = JUMP
+		_try_jump(move_x)
 		jump_requested = false
 	if dash_requested:
 		_start_dash(aim)
@@ -218,12 +229,7 @@ func _step(dt: float) -> void:
 		if dash_left <= 0.0:
 			vel *= 0.42
 	else:
-		if signing and not latch_mode:
-			# Maintain momentum; ground friction gently slows coasting.
-			vel.x = move_toward(vel.x, 0.0, (330.0 if grounded else 60.0) * dt)
-		else:
-			var x := latched if signing else _axis()
-			vel.x = move_toward(vel.x, x * RUN, (2900.0 if grounded else 1350.0) * dt)
+		_move_horizontal(move_x, dt)
 		if not grounded:
 			vel.y += GRAVITY * dt
 		elif vel.y > 0:
@@ -270,10 +276,10 @@ func _step(dt: float) -> void:
 	camera = camera.lerp(focus, minf(dt * 6.0, 1.0))
 	queue_redraw()
 
-func _start_dash(d: Vector2, free: bool = false) -> bool:
-	if not free and (dash_cooldown > 0.0 or dash_left > 0.0 or (not grounded and air_dashes <= 0)):
+func _start_dash(d: Vector2) -> bool:
+	if dash_cooldown > 0.0 or dash_left > 0.0 or (not grounded and air_dashes <= 0):
 		return false
-	if not free and not grounded:
+	if not grounded:
 		air_dashes -= 1
 	# Ground dashes cannot point into the ground.
 	if grounded and d.y > 0.0:
@@ -292,13 +298,9 @@ func _cast() -> void:
 	prepared_spell = ""
 	ready_left = 0.0
 	casts += 1
-	if spell == "Rush":
-		_start_dash(aim, true)
-		_notice("Rush released")
-	else:
-		var orb := spell == "Orb"
-		shots.append({"p":_center() + aim * 28.0, "v":aim * (610.0 if orb else 1250.0), "r":24.0 if orb else 9.0, "life":2.8 if orb else 1.8, "c":GOLD if orb else BLUE})
-		_notice(spell + " released")
+	var orb := spell == "Orb"
+	shots.append({"p":_center() + aim * 28.0, "v":aim * (610.0 if orb else 1250.0), "r":24.0 if orb else 9.0, "life":2.8 if orb else 1.8, "c":GOLD if orb else BLUE})
+	_notice(spell + " released")
 
 func _label(at: Vector2, value: String, size: int = 14, color: Color = Color.WHITE) -> void:
 	draw_string(ThemeDB.fallback_font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
@@ -344,11 +346,11 @@ func _draw() -> void:
 	draw_rect(Rect2(0, 0, dims.x, 90), Color("#111a27"))
 	_label(Vector2(16, 24), "N / mobility + hand signs   |   60 Hz sandbox", 20, BLUE)
 	_label(Vector2(16, 47), "WASD aim / A D move   SPACE jump   SHIFT + WASD signs   J cast   " + LAYOUTS[layout], 14)
-	_label(Vector2(16, 69), "Arrows: optional independent aim   L / ESC cancel   F2 coast/latch   F3 target   F4 layout   R reset", 14)
-	_label(Vector2(dims.x - 230, 24), "Mode: " + ("LATCH" if latch_mode else "COAST"), 15, GOLD)
+	_label(Vector2(16, 69), "Arrows: optional independent aim   L / ESC cancel   F3 target   F4 layout   R reset", 14)
+	_label(Vector2(dims.x - 230, 24), "M4 / COAST", 15, GOLD)
 	var bottom := dims.y - 86.0
 	draw_rect(Rect2(0, bottom, dims.x, 86), Color("#111a27"))
-	_label(Vector2(16, bottom + 21), "BOLT: W D S     ORB: S W D W     RUSH: A D W", 16, GOLD)
+	_label(Vector2(16, bottom + 21), "BOLT: A S D     ORB: A D A D", 16, GOLD)
 	_label(Vector2(16, bottom + 44), "Air dashes: %d/2    Double jump: %s    Casts: %d    Hits: %d" % [air_dashes, "ready" if air_jump else "used", casts, hits], 14)
 	var status := ("Signs: " + sequence) if signing else "Move freely"
 	if layout == 1 and not signing and prepared_spell.is_empty():

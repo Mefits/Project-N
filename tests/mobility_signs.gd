@@ -23,7 +23,7 @@ func _run() -> void:
 		return
 	root.add_child(lab)
 	lab.set_physics_process(false)
-	check(lab.layout == 0 and not lab.latch_mode, "keyboard default coast")
+	check(lab.layout == 0, "keyboard default coast")
 	lab._aim_from_keys(Vector2(1, -1), Vector2.ZERO)
 	check(lab.aim.is_equal_approx(Vector2(1, -1).normalized()), "diagonal aim")
 	key(lab, KEY_SHIFT)
@@ -31,9 +31,9 @@ func _run() -> void:
 	check(lab.aim.is_equal_approx(Vector2(1, -1).normalized()), "seal input does not redirect aim")
 	lab._aim_from_keys(Vector2.ZERO, Vector2.UP)
 	check(lab.aim == Vector2.UP, "arrow override during seals")
-	key(lab, KEY_W)
-	key(lab, KEY_D)
+	key(lab, KEY_A)
 	key(lab, KEY_S)
+	key(lab, KEY_D)
 	check(lab.prepared_spell == "Bolt" and not lab.dash_requested, "Shift seals")
 	key(lab, KEY_SHIFT, false)
 	key(lab, KEY_J)
@@ -62,10 +62,10 @@ func _run() -> void:
 	key(lab, KEY_F4)
 	check(lab.layout == 0, "restore standard keyboard")
 	key(lab, KEY_SHIFT)
-	key(lab, KEY_W)
-	key(lab, KEY_D)
+	key(lab, KEY_A)
 	key(lab, KEY_S)
-	check(lab.prepared_spell == "Bolt", "WDS prepares Bolt")
+	key(lab, KEY_D)
+	check(lab.prepared_spell == "Bolt", "ASD prepares Bolt")
 	check(is_equal_approx(lab.ready_left, 8.0), "ready duration")
 	key(lab, KEY_SHIFT, false)
 	check(not lab.signing and lab.prepared_spell == "Bolt", "release modifier preserves prepared spell")
@@ -76,8 +76,9 @@ func _run() -> void:
 	key(lab, KEY_SHIFT)
 	key(lab, KEY_A)
 	key(lab, KEY_D)
-	key(lab, KEY_W)
-	check(lab.prepared_spell == "Rush", "ADW prepares Rush")
+	key(lab, KEY_A)
+	key(lab, KEY_D)
+	check(lab.prepared_spell == "Orb", "ADAD prepares Orb")
 	lab.ready_left = 0.01
 	lab._step(1.0 / 60.0)
 	check(lab.prepared_spell.is_empty(), "expiry")
@@ -92,13 +93,29 @@ func _run() -> void:
 	lab.vel.x = 400
 	key(lab, KEY_SHIFT)
 	lab._step(1.0 / 60.0)
-	check(lab.vel.x > 390 and lab.pos.x > 800, "coasting preserves motion")
+	check(is_equal_approx(lab.vel.x, 389.0) and lab.pos.x > 800, "ground coast 660 with seals")
+	key(lab, KEY_SHIFT, false)
+	lab.vel.x = 400.0
+	lab._step(1.0 / 60.0)
+	check(is_equal_approx(lab.vel.x, 389.0), "same coast without seals")
+	lab.grounded = false
+	lab.pos.y = 400.0
+	lab.vel.x = 400.0
+	lab._move_horizontal(0.0, 1.0 / 60.0)
+	check(is_equal_approx(lab.vel.x, 398.0), "air coast 120")
+	lab.vel = Vector2(850, 140)
+	lab.dash_left = 0.1
+	check(lab._try_jump(-1.0), "jump cancels ongoing dash")
+	check(lab.vel == Vector2(-420, -760) and lab.dash_left == 0.0 and not lab.air_jump, "jump resets both axes and reverses")
+	check(not lab._try_jump(1.0), "no extra jump without landing")
 	lab._cancel()
 	lab._reset()
 	lab.grounded = false
 	lab.pos.y = 400
 	check(lab._start_dash(Vector2.RIGHT), "air dash")
 	check(lab.air_dashes == 1, "air charge consumed")
+	lab._step(1.0 / 60.0)
+	check(is_equal_approx(lab.vel.length(), 850.0), "dash speed halved")
 	lab.dash_left = 0.0
 	lab.dash_cooldown = 0.0
 	check(lab._start_dash(Vector2.UP), "second air dash")
