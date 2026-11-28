@@ -40,12 +40,44 @@ func _legs(p:Dictionary,f:Dictionary,hip:Vector2,kick:Variant=null)->void:
         p["knee_"+s]=_world(leg[0],f)
         # Visual stretch/shortening is allowed. Never move the actual contact rig.
         p["foot_"+s]=_world(foot,f)
+# 0.10.3b: authored direction hypothesis, not measured source timing.
+# Keep world/contact time fixed. Deepen the load and accelerate into extension.
+# Jab 3/6/8, cross 4/7/9, hook 4/7/10, kick 6/12/17 are the original pose beats.
+func _directed_key(kind:String,age:int)->Array:
+    var k:Array=POSE.sample(kind,age).duplicate(true)
+    var peak:float=4.0 if kind!="finisher" else 12.0
+    var start:float=0.0 if kind!="finisher" else 3.0
+    var end:float=8.0 if kind!="finisher" else 17.0
+    var t:float=float(age)
+    var load:float=smoothstep(start,peak,t)*(1.0-smoothstep(peak,end,t))
+    var release:float=smoothstep(peak,end,t)*(1.0-smoothstep(end,end+7.0,t))
+    var hip:Vector2=k[1]
+    var torso:Vector2=k[2]
+    if kind=="finisher":
+        hip+=Vector2(-3,3)*load
+        torso+=Vector2(-5,1)*release
+        k[9]=Vector2(k[9])+Vector2(-3,-5)*load
+    else:
+        hip+=Vector2(-4,3)*load+Vector2(2,-1)*release
+        torso+=Vector2(-6,2)*load+Vector2(4,0)*release
+    k[1]=hip
+    k[2]=torso
+    k[3]=Vector2(k[3])+Vector2(3,-1)*load+Vector2(-3,0)*release
+    k[4]=clampf(float(k[4])+2.0*load-1.0*release,2.0,12.0)
+    # Different silhouettes, keeping the free hand near a defensible guard.
+    var elbow_index:int=7 if kind=="cross" else 5
+    var wrist_index:int=elbow_index+1
+    if kind!="finisher":
+        k[elbow_index]=Vector2(k[elbow_index])+Vector2(-5,-3 if kind=="hook" else 2)*load
+        k[wrist_index]=Vector2(k[wrist_index])+Vector2(-4,-3 if kind=="hook" else 2)*load
+    return k
+
 func _attacker(i:int)->Dictionary:
     var frame:Dictionary=record.frames[i]
     var f:Dictionary=frame.a
     if f.age<0:return f.points.duplicate(true)
     if not f.kind in ["jab","cross","hook","finisher"]:return f.points.duplicate(true)
-    var key:Array=POSE.sample(f.kind,f.age)
+    var key:Array=_directed_key(f.kind,f.age)
     var hip:Vector2=key[1]
     var chest:Vector2=hip+Vector2(key[2])
     var p:Dictionary={"hips":_world(hip,f),"chest":_world(chest,f),"head":_world(chest+Vector2(key[3]),f)}
@@ -94,9 +126,9 @@ func _victim(i:int)->Dictionary:
     # Start from original recorded support but independently author the upper body.
     # A normal idle guard pose is used instead of the hybrid hurt shoulders/arms.
     var hip:Vector2=_local(f.points.hips,f).lerp(Vector2(-9,-43 if kick else -47),power)
-    var lean:float=lerpf(2.0,-48.0 if kick else (-36.0 if cross else -27.0),power)
+    var lean:float=lerpf(2.0,-55.0 if kick else (-44.0 if cross else (-38.0 if impact_kind=="hook" else -32.0)),power)
     var chest:Vector2=hip+Vector2(0,-34).rotated(deg_to_rad(lean))
-    var head:Vector2=chest+Vector2(0,-22).rotated(deg_to_rad(lean*.8-15*power))
+    var head:Vector2=chest+Vector2(0,-22).rotated(deg_to_rad(lean*.8-20*power))
     var p:Dictionary={"hips":_world(hip,f),"chest":_world(chest,f),"head":_world(head,f)}
     for j in range(2):
         var s:String="near" if j==0 else "far"
@@ -118,21 +150,28 @@ func _secondary(p0:Dictionary,f:Dictionary,attacker:bool,i:int)->Dictionary:
     if record.frames[i].contact_event:return p
     if attacker:
         # Selective lag on the head and non-striking arm only. No root/feet/fist change.
-        if f.age<0 or i<2:return p
-        var old:Dictionary=authored[i-2].a
-        var lag:Vector2=(Vector2(old.head)-Vector2(p.head)).limit_length(5)*.5
+        if f.age<0 or i<4:return p
+        var old:Dictionary=authored[i-4].a
+        var old_head:Vector2=Vector2(old.head)-Vector2(old.chest)
+        var head:Vector2=Vector2(p.head)-Vector2(p.chest)
+        var lag:Vector2=(old_head-head).limit_length(8)*.9
         p.head+=lag
         var side:String="near" if f.strike=="hand_far" else "far"
+        var sh:String="shoulder_"+side
+        # Rotate the free arm as a chain rather than independently dragging its joints.
+        var current:Vector2=Vector2(p["elbow_"+side])-Vector2(p[sh])
+        var previous:Vector2=Vector2(old["elbow_"+side])-Vector2(old[sh])
+        var angle:float=clampf(current.angle_to(previous)*.8,-.42,.42)
         for k in ["elbow_"+side,"hand_"+side]:
-            p[k]+=(Vector2(old[k])-Vector2(p[k])).limit_length(7)*.35
+            p[k]=Vector2(p[sh])+(Vector2(p[k])-Vector2(p[sh])).rotated(angle)
     elif f.hurt>0:
         # Reuse the measured spring response selectively, not the baseline hurt pose.
         var angles:Vector4=f.reaction
-        p.head=Vector2(p.chest)+(Vector2(p.head)-Vector2(p.chest)).rotated(deg_to_rad(angles.y*.32*f.face))
+        p.head=Vector2(p.chest)+(Vector2(p.head)-Vector2(p.chest)).rotated(deg_to_rad(clampf(angles.y*.85,-24.0,24.0)*f.face))
         for j in range(2):
             var side:String="near" if j==0 else "far"
             var sh:Vector2=p["shoulder_"+side]
-            var a:float=deg_to_rad((angles.z if j==0 else angles.w)*.25*f.face)
+            var a:float=deg_to_rad(clampf((angles.z if j==0 else angles.w)*.75,-30.0,30.0)*f.face)
             for k in ["elbow_"+side,"hand_"+side]:p[k]=sh+(Vector2(p[k])-sh).rotated(a)
     return p
 func sample(i:int,variant:int)->Dictionary:
